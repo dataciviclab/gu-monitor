@@ -69,6 +69,11 @@ def main():
         con.execute(f"CREATE TABLE existing AS SELECT * FROM read_parquet('{parquet_file}')")
         # Load new data
         con.execute(f"CREATE TABLE new_data AS SELECT * FROM read_json_auto('{tmp_file}')")
+        # Add missing columns to new_data
+        existing_cols = {r[0] for r in con.execute("DESCRIBE existing").fetchall()}
+        new_cols = {r[0] for r in con.execute("DESCRIBE new_data").fetchall()}
+        for col in existing_cols - new_cols:
+            con.execute(f"ALTER TABLE new_data ADD COLUMN {col} VARCHAR")
         # Merge: append new, skip duplicates
         con.execute("""
             CREATE TABLE merged AS
