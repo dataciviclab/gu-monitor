@@ -1,0 +1,21 @@
+# Data files (generated)
+data/gu_acts.json
+data/gu_acts_classified.json
+data/gu_acts_30gg.json
+data/_tmp_*.json
+
+# Local notes
+_local/
+
+# Python
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
