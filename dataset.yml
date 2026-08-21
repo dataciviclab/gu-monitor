@@ -1,0 +1,74 @@
+dataset:
+  name: gu_acts
+  display_name: Gazzetta Ufficiale — Atti pubblicati
+  description: >
+    Monitoraggio della Gazzetta Ufficiale della Repubblica Italiana:
+    tutti gli atti pubblicati nelle 7 serie (Serie Generale, Corte Costituzionale,
+    Unione Europea, Regioni, Concorsi, Contratti Pubblici, Parte II).
+    Aggiornamento giornaliero via scraping archivio 30gg.
+  source: Gazzetta Ufficiale — https://www.gazzettaufficiale.it
+  source_url: https://www.gazzettaufficiale.it
+  license: CC BY 4.0
+
+  coverage:
+    period_start: null  # accumula dal primo run
+    period_end: null    # vigente, si aggiorna
+    territory: Italia
+    granularity: atto
+
+  schema:
+    fields:
+      - name: id
+        type: string
+        description: Codice redazionale dell'atto (es. 26G00165)
+      - name: serie
+        type: string
+        description: Serie della GU (SG, S1, S2, S3, S4, S5, P2)
+      - name: gazzetta_numero
+        type: string
+        description: Numero della pubblicazione
+      - name: data_pubblicazione
+        type: date
+        description: Data di pubblicazione
+      - name: titolo
+        type: string
+        description: Titolo o descrizione dell'atto
+      - name: tipo_atto
+        type: string
+        description: Tipo classificato (LEGGE, DECRETO, REGOLAMENTO, etc.)
+      - name: ente
+        type: string
+        description: Ente emittente
+      - name: link
+        type: string
+        description: URL permanente (ELI o PDF)
+      - name: topic_str
+        type: string
+        description: Topic classificati (separati da virgola)
+
+    key_fields: [id, serie]
+
+  tags:
+    - gazzetta-ufficiale
+    - normativa
+    - legislazione
+    - atti-pubblici
+    - monitoraggio
+
+datasets:
+  - name: gu_acts
+    display_name: Atti Gazzetta Ufficiale (30gg)
+    path: data/gu_acts.parquet
+    description: >
+      Tutti gli atti pubblicati nella Gazzetta Ufficiale negli ultimi 30 giorni,
+      con classificazione automatica per tipo, ente e topic.
+    fields:
+      - id: string
+      - serie: string
+      - gazzetta_numero: string
+      - data_pubblicazione: date
+      - titolo: string
+      - tipo_atto: string
+      - ente: string
+      - link: string
+      - topic_str: string
