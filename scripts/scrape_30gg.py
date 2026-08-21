@@ -274,19 +274,37 @@ def fetch_detail(pub: dict) -> list[dict]:
 
 # ── Main ───────────────────────────────────────────────────────────────
 
+def load_processed(data_dir: Path) -> set[tuple[str, str]]:
+    """Load set of (serie, numero) pairs already processed."""
+    index_file = data_dir / "processed.json"
+    if index_file.exists():
+        data = json.loads(index_file.read_text())
+        return {(p["serie"], p["numero"]) for p in data}
+    return set()
+
+
+def save_processed(data_dir: Path, processed: set[tuple[str, str]]):
+    """Save processed index."""
+    index_file = data_dir / "processed.json"
+    data = [{"serie": s, "numero": n} for s, n in sorted(processed)]
+    index_file.write_text(json.dumps(data, indent=2))
+
+
 def main():
     data_dir = Path(__file__).parent.parent / "data"
     data_dir.mkdir(exist_ok=True)
     output_file = data_dir / "gu_acts_30gg.json"
 
-    # Load existing
+    # Load existing acts and processed index
     existing = []
     if output_file.exists():
         existing = json.loads(output_file.read_text())
     seen_ids = {(a["id"], a["serie"]) for a in existing}
+    processed = load_processed(data_dir)
 
     all_new = []
     total_pubs = 0
+    skipped = 0
 
     for serie in SERIE_30GG:
         print(f"\n[{serie}] Fetching lista 30gg...")
@@ -294,10 +312,11 @@ def main():
         print(f"  {len(pubs)} pubblicazioni trovate")
 
         for i, pub in enumerate(pubs):
-            key = (pub["numero"], pub["serie"])
-            # Quick check: skip if we already have acts for this gazzetta
-            if any(a["gazzetta_numero"] == pub["numero"] and a["serie"] == pub["serie"]
-                   for a in existing):
+            key = (pub["serie"], pub["numero"])
+
+            # Skip if already processed
+            if key in processed:
+                skipped += 1
                 continue
 
             print(f"  [{i+1}/{len(pubs)}] n°{pub['numero']} del {pub['data']}...", end=" ", flush=True)
@@ -308,6 +327,7 @@ def main():
                 for a in new_acts:
                     seen_ids.add((a["id"], a["serie"]))
                 all_new.extend(new_acts)
+                processed.add(key)
                 print(f"{len(new_acts)} atti")
                 time.sleep(0.5)  # Be polite
             except Exception as e:
@@ -315,14 +335,17 @@ def main():
 
         total_pubs += len(pubs)
 
-    # Merge
+    # Merge and save
     merged = existing + all_new
     output_file.write_text(json.dumps(merged, indent=2, ensure_ascii=False))
+    save_processed(data_dir, processed)
 
     print(f"\n{'=' * 50}")
     print(f"Pubblicazioni scansionate: {total_pubs}")
+    print(f"Skipped (già processate): {skipped}")
     print(f"Atti nuovi: {len(all_new)}")
     print(f"Atti totali: {len(merged)}")
+    print(f"Gazzette processate: {len(processed)}")
     print(f"Salvato in: {output_file}")
 
     return 0
