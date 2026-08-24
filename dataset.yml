@@ -35,16 +35,22 @@ dataset:
         description: Titolo o descrizione dell'atto
       - name: tipo_atto
         type: string
-        description: Tipo classificato (LEGGE, DECRETO, REGOLAMENTO, etc.)
+        description: Tipo classificato (25 valori)
       - name: ente
         type: string
         description: Ente emittente
       - name: link
         type: string
-        description: URL permanente (ELI o PDF)
+        description: URL permanente GU
       - name: topic_str
         type: string
         description: Topic classificati (separati da virgola)
+      - name: link_normattiva
+        type: string
+        description: Link a Normattiva (testo vigente)
+      - name: urn_normattiva
+        type: string
+        description: URN NIR (identificativo permanente)
 
     key_fields: [id, serie]
 
@@ -72,3 +78,5 @@ datasets:
       - ente: string
       - link: string
       - topic_str: string
+      - link_normattiva: string
+      - urn_normattiva: string

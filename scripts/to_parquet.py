@@ -53,13 +53,14 @@ def main():
         d = a.get("data_pubblicazione", "")
         if re.match(r"\d{2}-\d{2}-\d{4}", d):
             a["data_pubblicazione"] = f"{d[6:]}-{d[3:5]}-{d[:2]}"
-        # Add topics if missing
-        if "topic" not in a or not a["topic"]:
-            a["topic"] = extract_topics(a.get("titolo", ""), a.get("content_snippet", ""))
-        # Ensure topic is a list
-        if isinstance(a["topic"], str):
-            a["topic"] = [t.strip() for t in a["topic"].split(",") if t.strip()]
-        a["topic_str"] = ",".join(a["topic"]) if isinstance(a["topic"], list) else ""
+        # Add topic_str if missing
+        if "topic_str" not in a or not a["topic_str"]:
+            topics = a.get("topic", [])
+            if isinstance(topics, str):
+                topics = [t.strip() for t in topics.split(",") if t.strip()]
+            a["topic_str"] = ",".join(topics) if topics else ""
+        # Remove topic list (keep only topic_str)
+        a.pop("topic", None)
 
     # Write temp enriched file
     tmp_file = data_dir / "_tmp_enriched.json"
@@ -77,12 +78,13 @@ def main():
         new_cols = {r[0] for r in con.execute("DESCRIBE new_data").fetchall()}
         for col in existing_cols - new_cols:
             con.execute(f"ALTER TABLE new_data ADD COLUMN {col} VARCHAR")
-        # Merge: append new, skip duplicates
-        con.execute("""
+        # Merge: append new, skip duplicates (use explicit column list)
+        col_list = ", ".join(existing_cols)
+        con.execute(f"""
             CREATE TABLE merged AS
-            SELECT * FROM existing
+            SELECT {col_list} FROM existing
             UNION ALL
-            SELECT nd.* FROM new_data nd
+            SELECT {col_list} FROM new_data nd
             LEFT JOIN existing e ON nd.id = e.id AND nd.serie = e.serie
             WHERE e.id IS NULL
         """)
