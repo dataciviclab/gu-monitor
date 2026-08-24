@@ -106,7 +106,7 @@ def main():
     print("TREND SETTIMANALE")
     print("=" * 60)
     r = con.execute("""
-        SELECT DATE_TRUNC('week', data_pubblicazione) as settimana,
+        SELECT DATE_TRUNC('week', CAST(data_pubblicazione AS DATE)) as settimana,
                COUNT(*) as n
         FROM atti
         GROUP BY settimana
