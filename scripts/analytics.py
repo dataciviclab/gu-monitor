@@ -89,7 +89,7 @@ def main():
     print("MEDIA ATTI PER GIORNO SETTIMANA")
     print("=" * 60)
     r = con.execute("""
-        SELECT DAYNAME(data_pubblicazione) as giorno,
+        SELECT DAYNAME(CAST(data_pubblicazione AS DATE)) as giorno,
                COUNT(*) as totale,
                COUNT(DISTINCT data_pubblicazione) as giorni,
                ROUND(COUNT(*) * 1.0 / COUNT(DISTINCT data_pubblicazione), 0) as media
