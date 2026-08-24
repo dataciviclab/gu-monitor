@@ -56,7 +56,10 @@ def main():
         # Add topics if missing
         if "topic" not in a or not a["topic"]:
             a["topic"] = extract_topics(a.get("titolo", ""), a.get("content_snippet", ""))
-        a["topic_str"] = ",".join(a.get("topic", [])) if isinstance(a.get("topic"), list) else ""
+        # Ensure topic is a list
+        if isinstance(a["topic"], str):
+            a["topic"] = [t.strip() for t in a["topic"].split(",") if t.strip()]
+        a["topic_str"] = ",".join(a["topic"]) if isinstance(a["topic"], list) else ""
 
     # Write temp enriched file
     tmp_file = data_dir / "_tmp_enriched.json"
