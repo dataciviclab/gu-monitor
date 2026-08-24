@@ -78,11 +78,12 @@ def main():
         new_cols = {r[0] for r in con.execute("DESCRIBE new_data").fetchall()}
         for col in existing_cols - new_cols:
             con.execute(f"ALTER TABLE new_data ADD COLUMN {col} VARCHAR")
-        # Merge: append new, skip duplicates (use explicit column list)
-        col_list = ", ".join(existing_cols)
+        # Merge: append new, skip duplicates (use explicit column list with table aliases)
+        col_list = ", ".join([f"nd.{c}" for c in existing_cols])
+        col_list_e = ", ".join([f"e.{c}" for c in existing_cols])
         con.execute(f"""
             CREATE TABLE merged AS
-            SELECT {col_list} FROM existing
+            SELECT {col_list_e} FROM existing e
             UNION ALL
             SELECT {col_list} FROM new_data nd
             LEFT JOIN existing e ON nd.id = e.id AND nd.serie = e.serie
