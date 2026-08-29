@@ -52,7 +52,7 @@ dataset:
         type: string
         description: URN NIR (identificativo permanente)
 
-    key_fields: [id, serie]
+    key_fields: [id, link]
 
   tags:
     - gazzetta-ufficiale

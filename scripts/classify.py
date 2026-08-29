@@ -7,25 +7,35 @@ import sys
 from collections import Counter
 from pathlib import Path
 
-# ── Topic keywords ──────────────────────────────────────────────────────
+# ── Topic keywords (synced with to_parquet.py) ─────────────────────────────
 TOPIC_KEYWORDS = {
-    "fisco": ["fiscale", "tributario", "tributi", "imposta", "irpef", "iva", "accisa"],
+    "fisco": ["fiscale", "tributario", "tributi", "imposta", "irpef", "iva", "accisa",
+              "bilancio", "rendicont"],
     "sanita": ["farmaco", "medicinale", "sanitario", "ospedaliero", "asl", "aifa",
-               "comirnaty", "linagliptin", "aciclovir", "eltrombopag", "mitapivat"],
-    "lavoro": ["lavoro", "lavoratori", "impiego", "concors", "dipendente", "pubblico"],
-    "ambiente": ["ambiente", "ecolog", "compost", "rifiuti", "inquinamento"],
+               "medicin", "comirnaty", "linagliptin", "aciclovir", "eltrombopag", "mitapivat"],
+    "lavoro": ["lavoro", "lavoratori", "impiego", "concors", "dipendente", "pubblico",
+               "borsa di ricerca", "assegno di ricerca"],
+    "ambiente": ["ambiente", "ecolog", "compost", "rifiuti", "inquinamento",
+                 "bonifica", "sostenibilit"],
     "appalti": ["appalto", "contratto", "gara", "bandimento", "astante"],
     "pnrr": ["pnrr", "ripresa", "resilienza", "next generation"],
-    "energia": ["energia", "elettric", "gas", "idrogeno", "carburante"],
-    "sport": ["sport", "giuoco", "concorso atletico"],
-    "giustizia": ["giustizia", "penale", "civile", "tribunale", "corte"],
-    "europa": ["europeo", "europea", "ue", "regolamento (ue)", "decisione (ue)"],
-    "agricoltura": ["agricoltura", "agricolo", "zootecnico", "alimentare", "pesca"],
-    "istruzione": ["universit", "ricercat", "docente", "studente", "laurea"],
-    "trasporti": ["trasport", "autostrad", "ferroviario", "aeronautico"],
-    "cultura": ["cultura", "beni culturali", "turismo", "spettacolo"],
-    "edilizia": ["edilizia", "casa", "immobiliare", "urbanistica"],
+    "energia": ["energia", "elettric", "gas", "idrogeno", "carburante", "impianto fotovoltaico"],
+    "giustizia": ["giustizia", "penale", "civile", "tribunale", "corte",
+                  "notifica", "sentenza", "curatore", "falliment", "eredit"],
+    "europa": ["europeo", "europea", "ue ", "regolamento (ue)", "decisione (ue)",
+               "decisione pesc"],
+    "agricoltura": ["agricoltura", "agricolo", "zootecnico", "alimentare", "pesca",
+                    "viticolo", "denominazione di origine"],
+    "istruzione": ["universit", "ricercat", "docente", "studente", "laurea",
+                   "politecnico", "scuola"],
+    "trasporti": ["trasport", "autostrad", "ferroviario", "aeronautico", "portuale"],
+    "edilizia": ["edilizia", "casa", "immobiliare", "urbanistica", "catasto"],
     "sicurezza": ["sicurezza", "polizia", "carabinieri", "vigili del fuoco"],
+    "business": ["societa'", "società", "cooperativ", "assemblea", "consiglio di amministrazione",
+                 "s.p.a.", "s.r.l.", "s.a.s.", "conferimento"],
+    "governo_locale": ["regione", "regionale", "provincia", "comune ", "comunale",
+                       "concessione", "demaniale"],
+    "sanita_farmaci": ["autorizzazione all'immissione in commercio", "immissione in commercio"],
 }
 
 # ── Ente patterns ──────────────────────────────────────────────────────
@@ -158,10 +168,10 @@ def main():
     topics = Counter(t for a in classified for t in a["topic"])
 
     print(f"Classificati {len(classified)} atti → {output_file.name}")
-    print(f"\nTop 10 enti:")
+    print("\nTop 10 enti:")
     for e, n in enti.most_common(10):
         print(f"  {n:3d}  {e}")
-    print(f"\nTopic distribution:")
+    print("\nTopic distribution:")
     for t, n in topics.most_common():
         print(f"  {n:3d}  {t}")
 

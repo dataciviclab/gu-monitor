@@ -4,30 +4,30 @@
 
 La Gazzetta Ufficiale è il diario ufficiale dello Stato italiano. Ogni legge, ogni decreto, ogni bando di concorso passa da qui. Ma nessuno la monitora sistematicamente.
 
-Questo progetto lo fa: **4.330 atti in 30 giorni**, 7 serie, ~500 enti, tutto interrogabile.
+Questo progetto lo fa: **2.296 atti unici in 30 giorni**, 7 serie, 753 enti, 17 topic, tutto interrogabile.
 
+[![CI](https://github.com/dataciviclab/gu-monitor/actions/workflows/ci.yml/badge.svg)](https://github.com/dataciviclab/gu-monitor/actions/workflows/ci.yml)
 [![Daily Update](https://github.com/dataciviclab/gu-monitor/actions/workflows/daily-update.yml/badge.svg)](https://github.com/dataciviclab/gu-monitor/actions/workflows/daily-update.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 ---
 
-## Cosa puoi scoprire
+## Dashboard
 
-### 🏥 Quali farmaci entra (o esce) dal SSN
+La dashboard Streamlit mostra in tempo reale cosa pubblica lo Stato italiano.
 
-L'AIFA pubblica ogni giorno nella Gazzetta: **338 atti in 30 giorni**, di cui 128 comunicati su medicinali. Monitorare la serie SG significa sapere in tempo reale quali farmaci ottengono l'autorizzazione all'immissione in commercio.
+```bash
+# Avvio locale
+pip install -r requirements-dashboard.txt
+streamlit run app.py
+```
 
-### ⚖️ Quali bandi pubblici sono attivi
+Oppure con Docker:
 
-La serie Concorsi (S4) pubblica **1.026 atti in 30 giorni**: bandi di selezione, concorsi pubblici, graduatorie. Ogni università, ogni ASL, ogni comune italiano pubblica qui.
-
-### 🇪🇺 Cosa decide l'Unione Europea
-
-La serie UE (S2) contiene regolamenti, decisioni PESC (sanzioni), dazi antidumping. **262 atti in 30 giorni**, quasi tutti misure che impattano l'Italia.
-
-### ⚖️ Quali tribunali sono più attivi
-
-La Parte II (P2) è un database giudiziario pubblico: **1.734 atti in 30 giorni**, di cui 49% notifiche da tribunali italiani. Milano (28), Firenze (24), Bologna (22) sono i più produttivi.
+```bash
+docker build -t gu-monitor .
+docker run -p 8501:8501 gu-monitor
+```
 
 ---
 
@@ -35,19 +35,19 @@ La Parte II (P2) è un database giudiziario pubblico: **1.734 atti in 30 giorni*
 
 | Metrica | Valore |
 |---|---|
-| Atti totali (30gg) | **4.330** |
+| Atti unici (30gg) | **2.296** |
 | Serie monitorate | **7** |
-| Enti rilevati | **~500** |
-| Tipi di atto | **20** |
-| Topic classificati | **14** |
-| Media atti/giorno | **177** |
-| Peak day | **Martedì (283 atti)** |
+| Enti rilevati | **753** |
+| Tipi di atto | **19** |
+| Topic classificati | **17** |
+| Copertura topic | **67%** |
+| Peak day | **Martedì (141 atti/giorno)** |
 
 ---
 
 ## Dataset
 
-Il cuore è `data/gu_acts.parquet`: un singolo file Parquet con tutti gli atti degli ultimi 30 giorni.
+Il cuore è `data/gu_acts.parquet`: un singolo file Parquet con tutti gli atti unici degli ultimi 30 giorni. Chiave: `(id, link)`.
 
 | Colonna | Tipo | Descrizione |
 |---|---|---|
@@ -56,10 +56,10 @@ Il cuore è `data/gu_acts.parquet`: un singolo file Parquet con tutti gli atti d
 | `gazzetta_numero` | VARCHAR | Numero della pubblicazione |
 | `data_pubblicazione` | DATE | Data di pubblicazione |
 | `titolo` | VARCHAR | Titolo/descrizione dell'atto |
-| `tipo_atto` | VARCHAR | LEGGE / DECRETO / REGOLAMENTO / etc |
+| `tipo_atto` | VARCHAR | LEGGE / DECRETO / CONCORSO / etc (19 tipi) |
 | `ente` | VARCHAR | Ente emittente |
 | `link` | VARCHAR | URL permanente (ELI o PDF) |
-| `topic_str` | VARCHAR | Topic classificati |
+| `topic_str` | VARCHAR | Topic classificati (17 topic) |
 
 ---
 
@@ -97,11 +97,14 @@ pip install -r requirements.txt
 # Fetch storico 30gg
 python scripts/scrape_30gg.py
 
-# Converti in Parquet
+# Converti in Parquet (dedup su id+link)
 python scripts/to_parquet.py
 
 # Analytics
 python scripts/analytics.py
+
+# Analisi completa
+python scripts/analyze.py
 ```
 
 ---
@@ -111,7 +114,7 @@ python scripts/analytics.py
 Il workflow GitHub Actions `daily-update.yml` esegue ogni giorno alle 06:00 UTC:
 
 1. Scraping archivio 30gg (tutte le 7 serie)
-2. Conversione in Parquet
+2. Conversione in Parquet (dedup su id+link)
 3. Commit automatico se ci sono novità
 
 ---
@@ -121,20 +124,54 @@ Il workflow GitHub Actions `daily-update.yml` esegue ogni giorno alle 06:00 UTC:
 ```
 gu-monitor/
 ├── .github/workflows/
+│   ├── ci.yml                # CI: lint + test
 │   └── daily-update.yml      # Cron giornaliero
+├── .streamlit/
+│   └── config.toml           # Tema dashboard
 ├── scripts/
 │   ├── fetch_rss.py          # RSS → JSON
 │   ├── classify.py           # Enrich: ente, tipo, topic
 │   ├── scrape_30gg.py        # Scraper archivio 30gg
 │   ├── to_parquet.py         # JSON → Parquet
-│   └── analytics.py          # Report DuckDB
+│   ├── analytics.py          # Report DuckDB
+│   └── analyze.py            # Analisi completa
 ├── tests/
 │   └── test_basic.py         # 10 test
 ├── data/
-│   └── gu_acts.parquet       # Dataset finale
-└── _local/
-    └── PLAN.md               # Piano sperimentale
+│   └── gu_acts.parquet       # Dataset (2.296 atti unici)
+├── app.py                    # Dashboard Streamlit
+├── Dockerfile                # Container deploy
+├── requirements.txt          # Core deps
+├── requirements-dashboard.txt # Dashboard deps
+├── pyproject.toml            # Project config
+├── dataset.yml               # Schema
+├── schema.md                 # Documentazione schema
+└── README.md
 ```
+
+---
+
+## Topic
+
+| Topic | Descrizione |
+|---|---|
+| giustizia | Tribunali, notifiche, sentenze, eredità |
+| lavoro | Concorsi, borse di ricerca, impiego |
+| business | Società, assemblee, cooperative |
+| europa | Regolamenti UE, decisioni PESC |
+| fisco | Fiscale, tributario, bilancio |
+| governo_locale | Regioni, province, comuni, concessioni |
+| sanita | Farmaci, sanitario, ospedaliero |
+| istruzione | Università, ricerca, scuola |
+| sicurezza | Polizia, carabinieri |
+| ambiente | Ecologia, rifiuti, bonifica |
+| energia | Elettricità, gas, fotovoltaico |
+| agricoltura | Agricoltura, pesca, alimentare |
+| edilizia | Edilizia, immobiliare, catasto |
+| trasporti | Autostrade, ferrovie, porti |
+| appalti | Gare, contratti pubblici |
+| pnrr | PNRR, Next Generation EU |
+| sanita_farmaci | Autorizzazioni immissione commercio |
 
 ---
 

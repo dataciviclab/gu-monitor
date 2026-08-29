@@ -2,7 +2,7 @@
 """GU Monitor — Convert JSON → Parquet con append incrementale.
 
 Legge gu_acts_30gg.json, arricchisce con topic, e scrive/appende in gu_acts.parquet.
-Deduplica per (id, serie) prima di scrivere.
+Deduplica per (id, link) — la chiave naturale della Gazzetta.
 """
 
 import json
@@ -12,27 +12,44 @@ from pathlib import Path
 
 import duckdb
 
+# ── Topic keywords (espanso) ────────────────────────────────────────────────
+
 TOPIC_KEYWORDS = {
-    "fisco": ["fiscale", "tributario", "tributi", "imposta", "irpef", "iva", "accisa"],
-    "sanita": ["farmaco", "medicinale", "sanitario", "ospedaliero", "asl", "aifa", "medicin"],
-    "lavoro": ["lavoro", "lavoratori", "impiego", "concors", "dipendente", "pubblico"],
-    "ambiente": ["ambiente", "ecolog", "compost", "rifiuti", "inquinamento"],
-    "appalti": ["appalto", "contratto", "gara", "bandimento"],
+    # settori
+    "fisco": ["fiscale", "tributario", "tributi", "imposta", "irpef", "iva", "accisa",
+              "bilancio", "rendicont"],
+    "sanita": ["farmaco", "medicinale", "sanitario", "ospedaliero", "asl", "aifa",
+               "medicin", "comirnaty", "linagliptin"],
+    "lavoro": ["lavoro", "lavoratori", "impiego", "concors", "dipendente", "pubblico",
+               "borsa di ricerca", "assegno di ricerca"],
+    "ambiente": ["ambiente", "ecolog", "compost", "rifiuti", "inquinamento",
+                 "bonifica", "sostenibilit"],
+    "appalti": ["appalto", "contratto", "gara", "bandimento", "astante"],
     "pnrr": ["pnrr", "ripresa", "resilienza", "next generation"],
-    "energia": ["energia", "elettric", "gas", "idrogeno", "carburante"],
-    "giustizia": ["giustizia", "penale", "civile", "tribunale", "corte"],
-    "europa": ["europeo", "europea", "ue", "regolamento (ue)", "decisione (ue)"],
-    "agricoltura": ["agricoltura", "agricolo", "zootecnico", "alimentare", "pesca"],
-    "istruzione": ["universit", "ricercat", "docente", "studente", "laurea"],
-    "trasporti": ["trasport", "autostrad", "ferroviario", "aeronautico"],
-    "edilizia": ["edilizia", "casa", "immobiliare", "urbanistica"],
-    "sicurezza": ["sicurezza", "polizia", "carabinieri"],
+    "energia": ["energia", "elettric", "gas", "idrogeno", "carburante", "impianto fotovoltaico"],
+    "giustizia": ["giustizia", "penale", "civile", "tribunale", "corte",
+                  "notifica", "sentenza", "curatore", "falliment", "eredit"],
+    "europa": ["europeo", "europea", "ue ", "regolamento (ue)", "decisione (ue)",
+               "decisione pesc"],
+    "agricoltura": ["agricoltura", "agricolo", "zootecnico", "alimentare", "pesca",
+                    "viticolo", "denominazione di origine"],
+    "istruzione": ["universit", "ricercat", "docente", "studente", "laurea",
+                   "politecnico", "scuola"],
+    "trasporti": ["trasport", "autostrad", "ferroviario", "aeronautico", "portuale"],
+    "edilizia": ["edilizia", "casa", "immobiliare", "urbanistica", "catasto"],
+    "sicurezza": ["sicurezza", "polizia", "carabinieri", "vigili del fuoco"],
+    # nuovi topic per P2 e attività non-legislative
+    "business": ["societa'", "società", "cooperativ", "assemblea", "consiglio di amministrazione",
+                 "s.p.a.", "s.r.l.", "s.a.s.", "conferimento"],
+    "governo_locale": ["regione", "regionale", "provincia", "comune ", "comunale",
+                       "concessione", "demaniale"],
+    "sanita_farmaci": ["autorizzazione all'immissione in commercio", "immissione in commercio"],
 }
 
 
 def extract_topics(titolo: str, content: str = "") -> list[str]:
     text = f"{titolo} {content}".lower()
-    return [t for t, kws in TOPIC_KEYWORDS.items() if any(kw in text for kw in kws)]
+    return sorted(set(t for t, kws in TOPIC_KEYWORDS.items() if any(kw in text for kw in kws)))
 
 
 def main():
@@ -53,52 +70,42 @@ def main():
         d = a.get("data_pubblicazione", "")
         if re.match(r"\d{2}-\d{2}-\d{4}", d):
             a["data_pubblicazione"] = f"{d[6:]}-{d[3:5]}-{d[:2]}"
-        # Add topic_str if missing
-        if "topic_str" not in a or not a["topic_str"]:
-            topics = a.get("topic", [])
-            if isinstance(topics, str):
-                topics = [t.strip() for t in topics.split(",") if t.strip()]
-            a["topic_str"] = ",".join(topics) if topics else ""
+        # Compute topic_str from title (always recompute for fresh keywords)
+        titolo = a.get("titolo", "")
+        content = a.get("content_snippet", "")
+        topics = extract_topics(titolo, content)
+        # Merge with any existing topic from scraper
+        existing = a.get("topic", [])
+        if isinstance(existing, str):
+            existing = [t.strip() for t in existing.split(",") if t.strip()]
+        if existing:
+            topics = sorted(set(topics + existing))
+        a["topic_str"] = ",".join(topics) if topics else ""
         # Remove topic list (keep only topic_str)
         a.pop("topic", None)
+        a.pop("content_snippet", None)
+        a.pop("timestamp_fetch", None)
+
+    # Deduplicate on (id, link) — the natural key
+    seen = set()
+    deduped = []
+    for a in data:
+        key = (a.get("id", ""), a.get("link", ""))
+        if key not in seen:
+            seen.add(key)
+            deduped.append(a)
+    print(f"JSON caricati:   {len(data)}")
+    print(f"Dopo dedup:      {len(deduped)} (rimossi {len(data) - len(deduped)} duplicati)")
 
     # Write temp enriched file
     tmp_file = data_dir / "_tmp_enriched.json"
-    tmp_file.write_text(json.dumps(data, ensure_ascii=False))
+    tmp_file.write_text(json.dumps(deduped, ensure_ascii=False))
 
     con = duckdb.connect(":memory:")
 
-    if parquet_file.exists():
-        # Load existing parquet
-        con.execute(f"CREATE TABLE existing AS SELECT * FROM read_parquet('{parquet_file}')")
-        # Load new data
-        con.execute(f"CREATE TABLE new_data AS SELECT * FROM read_json_auto('{tmp_file}')")
-        # Add missing columns to new_data
-        existing_cols = {r[0] for r in con.execute("DESCRIBE existing").fetchall()}
-        new_cols = {r[0] for r in con.execute("DESCRIBE new_data").fetchall()}
-        for col in existing_cols - new_cols:
-            con.execute(f"ALTER TABLE new_data ADD COLUMN {col} VARCHAR")
-        # Merge: append new, skip duplicates (use explicit column list with table aliases)
-        col_list = ", ".join([f"nd.{c}" for c in existing_cols])
-        col_list_e = ", ".join([f"e.{c}" for c in existing_cols])
-        con.execute(f"""
-            CREATE TABLE merged AS
-            SELECT {col_list_e} FROM existing e
-            UNION ALL
-            SELECT {col_list} FROM new_data nd
-            LEFT JOIN existing e ON nd.id = e.id AND nd.serie = e.serie
-            WHERE e.id IS NULL
-        """)
-        n_existing = con.execute("SELECT COUNT(*) FROM existing").fetchone()[0]
-        n_new = con.execute("SELECT COUNT(*) FROM new_data").fetchone()[0]
-        n_merged = con.execute("SELECT COUNT(*) FROM merged").fetchone()[0]
-        n_added = n_merged - n_existing
-    else:
-        con.execute(f"CREATE TABLE merged AS SELECT * FROM read_json_auto('{tmp_file}')")
-        n_existing = 0
-        n_new = con.execute("SELECT COUNT(*) FROM merged").fetchone()[0]
-        n_merged = n_new
-        n_added = n_new
+    # Always rebuild from scratch for a clean parquet
+    con.execute(f"CREATE TABLE merged AS SELECT * FROM read_json_auto('{tmp_file}')")
+    n_merged = con.execute("SELECT COUNT(*) FROM merged").fetchone()[0]
 
     # Write parquet
     con.execute(f"COPY merged TO '{parquet_file}' (FORMAT PARQUET, COMPRESSION 'zstd')")
@@ -106,14 +113,10 @@ def main():
     tmp_file.unlink(missing_ok=True)
     con.close()
 
-    print(f"Esisto: {n_existing} atti")
-    print(f"Nuovi:  {n_added} atti")
-    print(f"Totale: {n_merged} atti")
-    print(f"Salvato: {parquet_file}")
+    print(f"Salvato:         {n_merged} atti → {parquet_file}")
 
     return 0
 
 
 if __name__ == "__main__":
-    import re
     sys.exit(main())
