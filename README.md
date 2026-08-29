@@ -18,7 +18,7 @@ La dashboard Streamlit mostra in tempo reale cosa pubblica lo Stato italiano.
 
 ```bash
 # Avvio locale
-pip install -r requirements-dashboard.txt
+pip install -r requirements.txt
 streamlit run app.py
 ```
 
@@ -47,7 +47,7 @@ docker run -p 8501:8501 gu-monitor
 
 ## Dataset
 
-Il cuore è `data/gu_acts.parquet`: un singolo file Parquet con tutti gli atti unici degli ultimi 30 giorni. Chiave: `(id, link)`.
+Il cuore è `data/gu_acts.parquet`: un singolo file Parquet con tutti gli atti unici. Il dataset è cumulativo e cresce con il daily update. Chiave: `(id, link)`.
 
 | Colonna | Tipo | Descrizione |
 |---|---|---|
@@ -56,10 +56,10 @@ Il cuore è `data/gu_acts.parquet`: un singolo file Parquet con tutti gli atti u
 | `gazzetta_numero` | VARCHAR | Numero della pubblicazione |
 | `data_pubblicazione` | DATE | Data di pubblicazione |
 | `titolo` | VARCHAR | Titolo/descrizione dell'atto |
-| `tipo_atto` | VARCHAR | LEGGE / DECRETO / CONCORSO / etc (19 tipi) |
+| `tipo_atto` | VARCHAR | LEGGE / DECRETO / CONCORSO / etc (21 tipi) |
 | `ente` | VARCHAR | Ente emittente |
 | `link` | VARCHAR | URL permanente (ELI o PDF) |
-| `topic_str` | VARCHAR | Topic classificati (17 topic) |
+| `topic_str` | VARCHAR | Topic classificati (16 topic) |
 
 ---
 
@@ -94,17 +94,14 @@ GROUP BY serie ORDER BY media DESC;
 ```bash
 pip install -r requirements.txt
 
-# Fetch storico 30gg
+# Fetch incrementale 30gg
 python scripts/scrape_30gg.py
 
-# Converti in Parquet (dedup su id+link)
+# Converti in Parquet (dedup su id+link, append incrementale)
 python scripts/to_parquet.py
 
 # Analytics
 python scripts/analytics.py
-
-# Analisi completa
-python scripts/analyze.py
 ```
 
 ---
@@ -133,16 +130,14 @@ gu-monitor/
 │   ├── classify.py           # Enrich: ente, tipo, topic
 │   ├── scrape_30gg.py        # Scraper archivio 30gg
 │   ├── to_parquet.py         # JSON → Parquet
-│   ├── analytics.py          # Report DuckDB
-│   └── analyze.py            # Analisi completa
+│   └── analytics.py          # Report DuckDB
 ├── tests/
 │   └── test_basic.py         # 10 test
 ├── data/
-│   └── gu_acts.parquet       # Dataset (2.296 atti unici)
+│   └── gu_acts.parquet       # Dataset cumulativo
 ├── app.py                    # Dashboard Streamlit
 ├── Dockerfile                # Container deploy
-├── requirements.txt          # Core deps
-├── requirements-dashboard.txt # Dashboard deps
+├── requirements.txt          # Dipendenze
 ├── pyproject.toml            # Project config
 ├── dataset.yml               # Schema
 ├── schema.md                 # Documentazione schema
