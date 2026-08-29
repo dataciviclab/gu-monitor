@@ -35,7 +35,7 @@ dataset:
         description: Titolo o descrizione dell'atto
       - name: tipo_atto
         type: string
-        description: Tipo classificato (25 valori)
+        description: Tipo classificato (21 valori)
       - name: ente
         type: string
         description: Ente emittente
