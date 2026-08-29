@@ -188,7 +188,7 @@ class DetailParser(HTMLParser):
                 tipo = "ALTRO"
                 for t in ["LEGGE", "DECRETO-LEGGE", "DECRETO", "DETERMINA", "COMUNICATO",
                           "ORDINANZA", "REGOLAMENTO", "DECISIONE", "RETTIFICA",
-                          "TESTO COORDINATO", "AVVISO", "GRADUATORIA",
+                          "TESTO COORDINATO", "AVVISO", "GRADUATORIA", "CONCORSO",
                           "AUTORIZZAZIONE", "LIQUIDAZIONE", "MODIFICA", "REVOCA",
                           "VOLTURA", "SOSTITUZIONE", "RINUNCIA", "CONFERIMENTO",
                           "CONVOCAZIONE", "NOMINA", "ISCRIZIONE", "NOTIFICA",

@@ -80,6 +80,24 @@ def main():
     data = json.loads(json_file.read_text())
     data = enrich(data)
 
+    # Reclassify ALTRO based on title keywords
+    TIPO_TITLE_KEYWORDS = [
+        "CONCORSO", "SENTENZA", "NOTIFICA", "CONFERIMENTO", "CONVOCAZIONE",
+        "NOMINA", "LIQUIDAZIONE", "SOSTITUZIONE", "AUTORIZZAZIONE",
+        "REVOC", "PROROGA", "ISCRIZIONE", "RINUNCIA",
+    ]
+    reclassified = 0
+    for a in data:
+        if a.get("tipo_atto") == "ALTRO":
+            title_upper = a.get("titolo", "").upper()
+            for keyword in TIPO_TITLE_KEYWORDS:
+                if keyword in title_upper:
+                    a["tipo_atto"] = keyword.rstrip("C") if keyword == "REVOC" else keyword
+                    reclassified += 1
+                    break
+    if reclassified:
+        print(f"Riclassificati:  {reclassified} atti da ALTRO")
+
     # Deduplicate on (id, link)
     seen = set()
     deduped = []
