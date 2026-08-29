@@ -8,7 +8,7 @@ import xml.etree.ElementTree as ET
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from urllib.request import urlopen, Request
+from urllib.request import Request, urlopen
 
 FEEDS = {
     "SG": "https://www.gazzettaufficiale.it/rss/SG",
