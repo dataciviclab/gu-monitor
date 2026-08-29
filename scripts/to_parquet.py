@@ -41,7 +41,7 @@ TOPIC_KEYWORDS = {
     # nuovi topic per P2 e attività non-legislative
     "business": ["societa'", "società", "cooperativ", "assemblea", "consiglio di amministrazione",
                  "s.p.a.", "s.r.l.", "s.a.s.", "conferimento"],
-    "governo_locale": ["regione", "regionale", "provincia", "comune ", "comunale",
+    "governo_locale": ["regione", "regionale", "provincia", "comune di", "comunale",
                        "concessione", "demaniale"],
     "sanita_farmaci": ["autorizzazione all'immissione in commercio", "immissione in commercio"],
 }
