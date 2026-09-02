@@ -1,6 +1,10 @@
 [
   {
     "serie": "P2",
+    "numero": "100"
+  },
+  {
+    "serie": "P2",
     "numero": "84"
   },
   {
@@ -198,6 +202,10 @@
   {
     "serie": "S4",
     "numero": "66"
+  },
+  {
+    "serie": "S4",
+    "numero": "67"
   },
   {
     "serie": "S5",
@@ -406,5 +414,9 @@
   {
     "serie": "SG",
     "numero": "201"
+  },
+  {
+    "serie": "SG",
+    "numero": "202"
   }
 ]
