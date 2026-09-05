@@ -10,10 +10,13 @@ import duckdb
 import plotly.express as px
 import plotly.graph_objects as go
 import streamlit as st
+from lab_connectors.branding import apply_branding
 
 # ── Config ───────────────────────────────────────────────────────────────────
 
 st.set_page_config(page_title="GU Monitor", page_icon="🏛️", layout="wide")
+
+apply_branding(repo_name="gu-monitor", repo_url="https://github.com/dataciviclab/gu-monitor")
 
 PARQUET = Path(__file__).parent / "data" / "gu_acts.parquet"
 
@@ -43,22 +46,33 @@ df_date = q(
 )
 
 filter_serie = st.sidebar.multiselect(
-    "Serie", options=df_serie["serie"].tolist(), default=df_serie["serie"].tolist(),
+    "Serie",
+    options=df_serie["serie"].tolist(),
+    default=df_serie["serie"].tolist(),
 )
 filter_tipo = st.sidebar.multiselect(
-    "Tipo atto", options=df_tipi["tipo_atto"].tolist(), default=df_tipi["tipo_atto"].tolist(),
+    "Tipo atto",
+    options=df_tipi["tipo_atto"].tolist(),
+    default=df_tipi["tipo_atto"].tolist(),
 )
 filter_ente = st.sidebar.multiselect(
-    "Ente", options=df_enti["ente"].tolist(), default=[], placeholder="Tutti gli enti",
+    "Ente",
+    options=df_enti["ente"].tolist(),
+    default=[],
+    placeholder="Tutti gli enti",
 )
 
 min_date, max_date = df_date["min_d"].iloc[0], df_date["max_d"].iloc[0]
 filter_date = st.sidebar.date_input(
-    "Periodo", value=(min_date, max_date), min_value=min_date, max_value=max_date,
+    "Periodo",
+    value=(min_date, max_date),
+    min_value=min_date,
+    max_value=max_date,
 )
 search = st.sidebar.text_input("🔍 Cerca nel titolo")
 
 # ── Costruisci WHERE ────────────────────────────────────────────────────────
+
 
 def esc(v: str) -> str:
     """Escape single quotes for SQL."""
@@ -116,14 +130,22 @@ with col_trend:
         df_pivot = df_trend.pivot(index="giorno", columns="serie", values="n").fillna(0)
         fig = go.Figure()
         for col in df_pivot.columns:
-            fig.add_trace(go.Scatter(
-                x=df_pivot.index, y=df_pivot[col], name=col,
-                mode="lines+markers", stackgroup="one",
-            ))
+            fig.add_trace(
+                go.Scatter(
+                    x=df_pivot.index,
+                    y=df_pivot[col],
+                    name=col,
+                    mode="lines+markers",
+                    stackgroup="one",
+                )
+            )
         fig.update_layout(
-            margin=dict(l=0, r=0, t=0, b=0), height=350,
+            margin=dict(l=0, r=0, t=0, b=0),
+            height=350,
             legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
-            xaxis_title="", yaxis_title="Atti", hovermode="x unified",
+            xaxis_title="",
+            yaxis_title="Atti",
+            hovermode="x unified",
         )
         st.plotly_chart(fig, use_container_width=True)
     else:
@@ -137,16 +159,29 @@ with col_serie:
     """)
     if not df_serie_cnt.empty:
         colors_map = {
-            "SG": "#636EFA", "S1": "#EF553B", "S2": "#00CC96",
-            "S3": "#AB63FA", "S4": "#FFA15A", "S5": "#19D3F3", "P2": "#FF6692",
+            "SG": "#636EFA",
+            "S1": "#EF553B",
+            "S2": "#00CC96",
+            "S3": "#AB63FA",
+            "S4": "#FFA15A",
+            "S5": "#19D3F3",
+            "P2": "#FF6692",
         }
         fig = px.bar(
-            df_serie_cnt, x="n", y="serie", orientation="h", text="n",
-            color="serie", color_discrete_map=colors_map,
+            df_serie_cnt,
+            x="n",
+            y="serie",
+            orientation="h",
+            text="n",
+            color="serie",
+            color_discrete_map=colors_map,
         )
         fig.update_layout(
-            margin=dict(l=0, r=0, t=0, b=0), height=350,
-            showlegend=False, xaxis_title="", yaxis_title="",
+            margin=dict(l=0, r=0, t=0, b=0),
+            height=350,
+            showlegend=False,
+            xaxis_title="",
+            yaxis_title="",
         )
         fig.update_traces(textposition="outside")
         st.plotly_chart(fig, use_container_width=True)
@@ -160,17 +195,24 @@ with col_enti:
     ente_filter = [p for p in where_parts if not p.startswith("ente ")]
     df_enti_top = q(f"""
         SELECT ente, COUNT(*) AS n FROM atti
-        WHERE ente IS NOT NULL {(' AND ' + ' AND '.join(ente_filter)) if ente_filter else ''}
+        WHERE ente IS NOT NULL {(" AND " + " AND ".join(ente_filter)) if ente_filter else ""}
         GROUP BY ente ORDER BY n DESC LIMIT 15
     """)
     if not df_enti_top.empty:
         df_enti_top["ente_short"] = df_enti_top["ente"].str[:55]
         fig = px.bar(
-            df_enti_top.sort_values("n"), x="n", y="ente_short",
-            orientation="h", text="n", color_discrete_sequence=["#636EFA"],
+            df_enti_top.sort_values("n"),
+            x="n",
+            y="ente_short",
+            orientation="h",
+            text="n",
+            color_discrete_sequence=["#636EFA"],
         )
         fig.update_layout(
-            margin=dict(l=0, r=0, t=0, b=0), height=450, xaxis_title="", yaxis_title="",
+            margin=dict(l=0, r=0, t=0, b=0),
+            height=450,
+            xaxis_title="",
+            yaxis_title="",
         )
         fig.update_traces(textposition="outside")
         st.plotly_chart(fig, use_container_width=True)
@@ -185,8 +227,11 @@ with col_tipi:
     """)
     if not df_tipi_cnt.empty:
         fig = px.treemap(
-            df_tipi_cnt, path=["tipo_atto"], values="n",
-            color="n", color_continuous_scale="Blues",
+            df_tipi_cnt,
+            path=["tipo_atto"],
+            values="n",
+            color="n",
+            color_continuous_scale="Blues",
         )
         fig.update_layout(margin=dict(l=0, r=0, t=0, b=0), height=450)
         st.plotly_chart(fig, use_container_width=True)
@@ -204,19 +249,24 @@ with col_topic:
             SELECT UNNEST(string_split(topic_str, ',')) AS topic
             FROM atti
             WHERE topic_str IS NOT NULL AND topic_str != ''
-            {(' AND ' + where_cond) if where_cond else ''}
+            {(" AND " + where_cond) if where_cond else ""}
         )
         SELECT TRIM(topic) AS topic, COUNT(*) AS n FROM split_topics
         WHERE TRIM(topic) != '' GROUP BY TRIM(topic) ORDER BY n DESC
     """)
     if not df_topics.empty:
         fig = px.pie(
-            df_topics, values="n", names="topic", hole=0.4,
+            df_topics,
+            values="n",
+            names="topic",
+            hole=0.4,
             color_discrete_sequence=px.colors.qualitative.Set2,
         )
         fig.update_layout(
-            margin=dict(l=0, r=0, t=0, b=0), height=400,
-            showlegend=True, legend=dict(orientation="v", font=dict(size=11)),
+            margin=dict(l=0, r=0, t=0, b=0),
+            height=400,
+            showlegend=True,
+            legend=dict(orientation="v", font=dict(size=11)),
         )
         fig.update_traces(textinfo="label+value")
         st.plotly_chart(fig, use_container_width=True)
@@ -235,20 +285,32 @@ with col_giorno:
     """)
     if not df_giorno.empty:
         giorno_it = {
-            "Monday": "Lun", "Tuesday": "Mar", "Wednesday": "Mer",
-            "Thursday": "Gio", "Friday": "Ven", "Saturday": "Sab", "Sunday": "Dom",
+            "Monday": "Lun",
+            "Tuesday": "Mar",
+            "Wednesday": "Mer",
+            "Thursday": "Gio",
+            "Friday": "Ven",
+            "Saturday": "Sab",
+            "Sunday": "Dom",
         }
         giorno_ord = list(giorno_it.keys())
         df_giorno["ord"] = df_giorno["giorno"].map({g: i for i, g in enumerate(giorno_ord)})
         df_giorno = df_giorno.sort_values("ord")
         df_giorno["giorno_label"] = df_giorno["giorno"].map(giorno_it)
         fig = px.bar(
-            df_giorno, x="giorno_label", y="media", text="media",
-            color="media", color_continuous_scale="Teal",
+            df_giorno,
+            x="giorno_label",
+            y="media",
+            text="media",
+            color="media",
+            color_continuous_scale="Teal",
         )
         fig.update_layout(
-            margin=dict(l=0, r=0, t=0, b=0), height=400,
-            xaxis_title="", yaxis_title="Atti / giorno", coloraxis_showscale=False,
+            margin=dict(l=0, r=0, t=0, b=0),
+            height=400,
+            xaxis_title="",
+            yaxis_title="Atti / giorno",
+            coloraxis_showscale=False,
         )
         fig.update_traces(textposition="outside")
         st.plotly_chart(fig, use_container_width=True)
@@ -272,7 +334,9 @@ df_table = q(f"""
 
 if not df_table.empty:
     st.dataframe(
-        df_table, use_container_width=True, height=400,
+        df_table,
+        use_container_width=True,
+        height=400,
         column_config={
             "data": st.column_config.DateColumn("Data"),
             "serie": st.column_config.TextColumn("Serie", width="small"),
@@ -294,4 +358,3 @@ st.caption(
     "Dati: Gazzetta Ufficiale · "
     "Aggiornamento: GitHub Actions · Licenza: MIT"
 )
-
