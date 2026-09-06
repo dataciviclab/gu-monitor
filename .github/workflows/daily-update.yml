@@ -25,6 +25,10 @@ jobs:
       - name: Scrape 30-day archive
         run: python scripts/scrape_30gg.py
 
+      - name: Cross-reference Normattiva (URN)
+        run: python scripts/crossref.py
+        continue-on-error: true
+
       - name: Convert to Parquet
         run: python scripts/to_parquet.py
 
