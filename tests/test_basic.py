@@ -87,7 +87,8 @@ class TestParquet:
 
         columns = {row[0] for row in con.execute("DESCRIBE atti").fetchall()}
         expected = {"id", "serie", "gazzetta_numero", "data_pubblicazione",
-                    "titolo", "tipo_atto", "ente", "link", "topic_str"}
+                    "titolo", "tipo_atto", "ente", "link", "topic_str",
+                    "urn_normattiva", "link_normattiva"}
         assert expected.issubset(columns)
 
     def test_parquet_has_all_series(self, parquet_path):
@@ -113,6 +114,21 @@ class TestParquet:
         assert min_date is not None
         assert max_date is not None
         assert max_date >= min_date
+
+    def test_parquet_urn_normattiva(self, parquet_path):
+        con = duckdb.connect(":memory:")
+        con.execute(f"CREATE TABLE atti AS SELECT * FROM read_parquet('{parquet_path}')")
+
+        # All rows should have urn_normattiva column (possibly empty)
+        cols = {row[0] for row in con.execute("DESCRIBE atti").fetchall()}
+        assert "urn_normattiva" in cols
+        assert "link_normattiva" in cols
+
+        # Some rows should have non-empty URN (from gu_links.json crossref)
+        non_empty = con.execute(
+            "SELECT COUNT(*) FROM atti WHERE urn_normattiva IS NOT NULL AND urn_normattiva != ''"
+        ).fetchone()[0]
+        assert non_empty > 0
 
 
 class TestAnalytics:

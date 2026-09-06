@@ -68,6 +68,29 @@ def enrich(data: list[dict]) -> list[dict]:
     return data
 
 
+def merge_normattiva_links(data: list[dict], data_dir: Path) -> list[dict]:
+    """Merge urn_normattiva and link_normattiva from gu_links.json into acts."""
+    links_file = data_dir / "gu_links.json"
+    if not links_file.exists():
+        print("gu_links.json non trovato — URN Normattiva non popolato")
+        return data
+
+    links = json.loads(links_file.read_text())
+    matched = 0
+    for a in data:
+        act_id = a.get("id", "")
+        if act_id in links:
+            a["urn_normattiva"] = links[act_id].get("urn", "")
+            a["link_normattiva"] = links[act_id].get("link_normattiva", "")
+            matched += 1
+        else:
+            a.setdefault("urn_normattiva", "")
+            a.setdefault("link_normattiva", "")
+
+    print(f"Normattiva URN:  {matched}/{len(data)} atti collegati")
+    return data
+
+
 def main():
     data_dir = Path(__file__).parent.parent / "data"
     json_file = data_dir / "gu_acts_30gg.json"
@@ -79,6 +102,7 @@ def main():
 
     data = json.loads(json_file.read_text())
     data = enrich(data)
+    data = merge_normattiva_links(data, data_dir)
 
     # Reclassify ALTRO based on title keywords
     TIPO_TITLE_KEYWORDS = [
@@ -123,6 +147,20 @@ def main():
             con.execute(f"ALTER TABLE new_data ADD COLUMN {col} VARCHAR")
         for col in new_cols - existing_cols:
             con.execute(f"ALTER TABLE existing ADD COLUMN {col} VARCHAR")
+
+        # Backfill urn_normattiva and link_normattiva on existing rows from new_data
+        backfilled_cols = [c for c in ["urn_normattiva", "link_normattiva"] if c in new_cols]
+        if backfilled_cols:
+            set_clause = ", ".join(
+                f"{c} = COALESCE(existing.{c}, new_data.{c})" for c in backfilled_cols
+            )
+            con.execute(f"""
+                UPDATE existing
+                SET {set_clause}
+                FROM new_data
+                WHERE existing.id = new_data.id AND existing.link = new_data.link
+            """)
+
         cols = sorted(existing_cols | new_cols)
         col_e = ", ".join([f"e.{c}" for c in cols])
         col_n = ", ".join([f"n.{c}" for c in cols])
