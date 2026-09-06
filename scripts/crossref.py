@@ -87,7 +87,7 @@ def main():
 
     print(f"Trovati {len(atti)} atti normativi da incrociare")
 
-    # Load existing crossref
+    # Load existing crossref — skip only successful lookups, allow retry for failures
     existing = {}
     if output_file.exists():
         existing = {r["id"]: r for r in json.loads(output_file.read_text())}
@@ -95,11 +95,16 @@ def main():
     results = []
     found = 0
     skipped = 0
+    retried = 0
 
     for i, (id_, serie, data_pub, titolo, tipo) in enumerate(atti):
-        if id_ in existing:
+        if id_ in existing and existing[id_].get("urn"):
             skipped += 1
             continue
+
+        # Mark as retry if previously failed
+        if id_ in existing and not existing[id_].get("urn"):
+            retried += 1
 
         data_gu = str(data_pub)
         print(f"  [{i+1}/{len(atti)}] {id_} ({data_gu})...", end=" ", flush=True)
@@ -141,6 +146,7 @@ def main():
     print(f"\n{'=' * 50}")
     print(f"Attj processati: {len(atti)}")
     print(f"Skipped (già fatti): {skipped}")
+    print(f"Retry (precedentemente falliti): {retried}")
     print(f"Trovati su Normattiva: {found}")
     print(f"Non trovati: {len(atti) - skipped - found}")
     print(f"Salvato in: {output_file}")

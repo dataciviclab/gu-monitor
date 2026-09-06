@@ -69,24 +69,36 @@ def enrich(data: list[dict]) -> list[dict]:
 
 
 def merge_normattiva_links(data: list[dict], data_dir: Path) -> list[dict]:
-    """Merge urn_normattiva and link_normattiva from gu_links.json into acts."""
-    links_file = data_dir / "gu_links.json"
-    if not links_file.exists():
-        print("gu_links.json non trovato — URN Normattiva non popolato")
+    """Merge urn_normattiva and link_normattiva from gu_crossref.json into acts.
+
+    Reads gu_crossref.json (produced by crossref.py) which contains
+    cross-reference results with URN and Normattiva metadata.
+    """
+    crossref_file = data_dir / "gu_crossref.json"
+
+    if not crossref_file.exists():
+        print("gu_crossref.json non trovato — URN Normattiva non popolato")
         return data
 
-    links = json.loads(links_file.read_text())
+    crossref = json.loads(crossref_file.read_text())
+    # crossref is a list of objects with id_gu key
+    lookup = {r["id_gu"]: r for r in crossref if r.get("id_gu")}
     matched = 0
     for a in data:
         act_id = a.get("id", "")
-        if act_id in links:
-            a["urn_normattiva"] = links[act_id].get("urn", "")
-            a["link_normattiva"] = links[act_id].get("link_normattiva", "")
-            matched += 1
+        if act_id in lookup:
+            cr = lookup[act_id]
+            urn = cr.get("urn", "")
+            if urn:
+                a["urn_normattiva"] = urn
+                a["link_normattiva"] = f"https://www.normattiva.it/uri-res/N2Ls?{urn}"
+                matched += 1
+            else:
+                a.setdefault("urn_normattiva", "")
+                a.setdefault("link_normattiva", "")
         else:
             a.setdefault("urn_normattiva", "")
             a.setdefault("link_normattiva", "")
-
     print(f"Normattiva URN:  {matched}/{len(data)} atti collegati")
     return data
 

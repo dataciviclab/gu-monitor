@@ -11,55 +11,11 @@ import pytest
 sys.path.insert(0, str(Path(__file__).parent.parent / "scripts"))
 
 
-class TestFetchRss:
-    """Test RSS feed parsing."""
-
-    def test_parse_feed_returns_list(self):
-        from fetch_rss import parse_feed
-
-        xml = b"""<?xml version="1.0" encoding="UTF-8"?>
-        <rss version="2.0" xmlns:content="http://purl.org/rss/1.0/modules/content/">
-        <channel>
-            <title>Test</title>
-            <item>
-                <title>LEGGE 1 agosto 2026, n. 100</title>
-                <link>http://example.com/eli/id/2026/08/01/26G00100/SG</link>
-                <content:encoded>Test content</content:encoded>
-                <pubDate>Sat, 01 Aug 2026 10:00:00 GMT</pubDate>
-            </item>
-        </channel>
-        </rss>"""
-
-        result = parse_feed(xml, "SG")
-        assert len(result) == 1
-        assert result[0].id == "26G00100"
-        assert result[0].serie == "SG"
-        assert result[0].tipo_atto == "LEGGE"
-        assert result[0].data_pubblicazione == "2026-08-01"
-
-    def test_classify_tipo(self):
-        from fetch_rss import classify_tipo
-
-        assert classify_tipo("LEGGE 1 agosto 2026, n. 100") == "LEGGE"
-        assert classify_tipo("DECRETO 1 agosto 2026") == "DECRETO"
-        assert classify_tipo("COMUNICATO") == "COMUNICATO"
-        assert classify_tipo("MINISTERO - DECRETO 1 agosto 2026") == "DECRETO"
-        assert classify_tipo("Random text") == "ALTRO"
-
-    def test_extract_ente(self):
-        from fetch_rss import extract_ente
-
-        assert extract_ente("MINISTERO DEL LAVORO - DECRETO 1 agosto") == "MINISTERO DEL LAVORO"
-        assert extract_ente("AGENZIA ITALIANA DEL FARMACO - COMUNICATO") == "AGENZIA ITALIANA DEL FARMACO"
-        assert extract_ente("REGOLAMENTO 17 giugno 2026") is None
-        assert extract_ente("LEGGE 1 agosto 2026") is None
-
-
-class TestClassify:
-    """Test topic classification."""
+class TestExtractTopics:
+    """Test topic classification (now in to_parquet.py)."""
 
     def test_extract_topics(self):
-        from classify import extract_topics
+        from to_parquet import extract_topics
 
         assert "sanita" in extract_topics("Classificazione medicinale Comirnaty", "")
         assert "lavoro" in extract_topics("Concorso pubblico per assistente", "")
