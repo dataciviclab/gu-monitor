@@ -90,7 +90,7 @@ def main():
     # Load existing crossref — skip only successful lookups, allow retry for failures
     existing = {}
     if output_file.exists():
-        existing = {r["id"]: r for r in json.loads(output_file.read_text())}
+        existing = {r["id_gu"]: r for r in json.loads(output_file.read_text())}
 
     results = []
     found = 0
