@@ -258,5 +258,45 @@
     "titolo_normattiva": "LEGGE 7 agosto 2026, n. 152",
     "sottotitolo": "Conversione in legge, con modificazioni, del decreto-legge 26  giugno\n2026,  n.  107,   recante   disposizioni   urgenti   per   interventi\ninfrastrutturali e per l'attuazione del Piano nazionale di r",
     "articolo_html": true
+  },
+  {
+    "id_gu": "26G00173",
+    "data_gu": "2026-08-26",
+    "titolo_gu": "DECRETO-LEGGE 26 agosto 2026, n. 153",
+    "tipo_atto": "LEGGE",
+    "urn": "urn:nir:stato:decreto.legge:2026-08-26;153",
+    "titolo_normattiva": "DECRETO-LEGGE 26 agosto 2026, n. 153",
+    "sottotitolo": "Disposizioni urgenti in materia di  prezzi  petroliferi  connessi  al\nprotrarsi della nuova crisi dei mercati internazionali. (26G00173)",
+    "articolo_html": true
+  },
+  {
+    "id_gu": "26G00174",
+    "data_gu": "2026-08-28",
+    "titolo_gu": "DECRETO-LEGGE 28 agosto 2026, n. 154",
+    "tipo_atto": "LEGGE",
+    "urn": "urn:nir:stato:decreto.legge:2026-08-28;154",
+    "titolo_normattiva": "DECRETO-LEGGE 28 agosto 2026, n. 154",
+    "sottotitolo": "Misure urgenti per assicurare la continuita' operativa di impianti di\ninteresse strategico nazionale. (26G00174)",
+    "articolo_html": true
+  },
+  {
+    "id_gu": "26G00171",
+    "data_gu": "2026-08-31",
+    "titolo_gu": "DECRETO DEL PRESIDENTE DELLA REPUBBLICA 19 giugno 2026, n. 155",
+    "tipo_atto": "DECRETO",
+    "urn": "urn:nir:stato:decreto:2026-06-19;155",
+    "titolo_normattiva": "DECRETO DEL PRESIDENTE DELLA REPUBBLICA 19 giugno 2026, n. 155",
+    "sottotitolo": "Regolamento  recante   modifica   dei   limiti   territoriali   della\ncircoscrizione dell'Autorita' di sistema portuale del Mare di Sicilia\nOrientale nel porto di Catania. (26G00171)",
+    "articolo_html": true
+  },
+  {
+    "id_gu": "26G00172",
+    "data_gu": "2026-09-03",
+    "titolo_gu": "DECRETO DEL PRESIDENTE DEL CONSIGLIO DEI MINISTRI 7 luglio 2026, n. 156",
+    "tipo_atto": "DECRETO",
+    "urn": "urn:nir:stato:decreto:2026-07-07;156",
+    "titolo_normattiva": "DECRETO DEL PRESIDENTE DEL CONSIGLIO DEI MINISTRI 7 luglio 2026, n. 156",
+    "sottotitolo": "Regolamento recante definizione dei compiti e dell'organizzazione del\nsistema  nazionale  di  allerta  rapida  per  le   droghe   (NEWS-D).\n(26G00172)",
+    "articolo_html": true
   }
 ]

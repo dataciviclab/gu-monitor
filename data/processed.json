@@ -156,6 +156,10 @@
     "numero": "69"
   },
   {
+    "serie": "S2",
+    "numero": "70"
+  },
+  {
     "serie": "S3",
     "numero": "29"
   },
@@ -466,5 +470,9 @@
   {
     "serie": "SG",
     "numero": "206"
+  },
+  {
+    "serie": "SG",
+    "numero": "207"
   }
 ]
