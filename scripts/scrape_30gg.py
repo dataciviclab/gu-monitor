@@ -6,6 +6,7 @@ Estrae tutti gli atti con: codice, ente, tipo, descrizione, pagina.
 """
 
 import json
+import random
 import re
 import sys
 import time
@@ -208,10 +209,20 @@ class DetailParser(HTMLParser):
 
 # ── Fetch helpers ──────────────────────────────────────────────────────
 
-def fetch(url: str, timeout: int = 20) -> str:
-    req = Request(url, headers={"User-Agent": "GU-Monitor/0.1"})
-    with urlopen(req, timeout=timeout) as resp:
-        return resp.read().decode("utf-8", errors="replace")
+def fetch(url: str, timeout: int = 20, retries: int = 3) -> str:
+    last_err = None
+    for attempt in range(1, retries + 1):
+        try:
+            req = Request(url, headers={"User-Agent": "GU-Monitor/0.1"})
+            with urlopen(req, timeout=timeout) as resp:
+                return resp.read().decode("utf-8", errors="replace")
+        except (OSError, TimeoutError) as e:
+            last_err = e
+            if attempt < retries:
+                wait = random.uniform(0, 2 ** attempt)
+                print(f"    Retry {attempt}/{retries} tra {wait:.1f}s ({e})", flush=True)
+                time.sleep(wait)
+    raise last_err
 
 
 def fetch_30gg_list(serie: str) -> list[dict]:
@@ -308,10 +319,16 @@ def main():
     all_new = []
     total_pubs = 0
     skipped = 0
+    failures = []
 
     for serie in SERIE_30GG:
         print(f"\n[{serie}] Fetching lista 30gg...")
-        pubs = fetch_30gg_list(serie)
+        try:
+            pubs = fetch_30gg_list(serie)
+        except Exception as e:
+            print(f"  ERRORE fetching lista: {e}")
+            failures.append((serie, "lista", str(e)))
+            continue
         print(f"  {len(pubs)} pubblicazioni trovate")
 
         for i, pub in enumerate(pubs):
@@ -335,6 +352,7 @@ def main():
                 time.sleep(0.5)  # Be polite
             except Exception as e:
                 print(f"ERRORE: {e}")
+                failures.append((serie, pub.get("numero", "?"), str(e)))
 
         total_pubs += len(pubs)
 
@@ -350,6 +368,12 @@ def main():
     print(f"Atti totali: {len(merged)}")
     print(f"Gazzette processate: {len(processed)}")
     print(f"Salvato in: {output_file}")
+
+    if failures:
+        print(f"\n{len(failures)} errori durante lo scraping:")
+        for serie, pub, err in failures:
+            print(f"  [{serie}] {pub}: {err}")
+        return 1
 
     return 0
 

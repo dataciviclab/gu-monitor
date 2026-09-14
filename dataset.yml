@@ -8,7 +8,7 @@ dataset:
     Aggiornamento giornaliero via scraping archivio 30gg.
   source: Gazzetta Ufficiale — https://www.gazzettaufficiale.it
   source_url: https://www.gazzettaufficiale.it
-  license: CC BY 4.0
+  license: MIT
 
   coverage:
     period_start: null  # accumula dal primo run

@@ -128,7 +128,7 @@ def main():
             title_upper = a.get("titolo", "").upper()
             for keyword in TIPO_TITLE_KEYWORDS:
                 if keyword in title_upper:
-                    a["tipo_atto"] = keyword.rstrip("C") if keyword == "REVOC" else keyword
+                    a["tipo_atto"] = "REVOCA" if keyword == "REVOC" else keyword
                     reclassified += 1
                     break
     if reclassified:
