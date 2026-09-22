@@ -164,7 +164,7 @@ def main():
         backfilled_cols = [c for c in ["urn_normattiva", "link_normattiva"] if c in new_cols]
         if backfilled_cols:
             set_clause = ", ".join(
-                f"{c} = COALESCE(existing.{c}, new_data.{c})" for c in backfilled_cols
+                f"{c} = COALESCE(NULLIF(existing.{c}, ''), new_data.{c})" for c in backfilled_cols
             )
             con.execute(f"""
                 UPDATE existing

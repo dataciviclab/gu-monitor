@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """GU Monitor — Cross-reference GU ↔ Normattiva.
 
-Cerca gli atti normativi GU (pattern 26G*) su Normattiva API
-e arricchisce il dataset con URN e testo vigente.
+Cerca gli atti normativi SG (LEGGE, DECRETO-LEGGE, DECRETO LEGISLATIVO)
+su Normattiva API e arricchisce il dataset con URN e testo vigente.
 """
 
 import json
@@ -77,11 +77,12 @@ def main():
     con = duckdb.connect(":memory:")
     con.execute(f"CREATE TABLE atti AS SELECT * FROM read_parquet('{parquet_file}')")
 
-    # Get normativi (26G pattern)
+    # Get normativi: all SG acts whose tipo_atto can have a Normattiva URN
     atti = con.execute("""
         SELECT id, serie, data_pubblicazione, titolo, tipo_atto
         FROM atti
-        WHERE serie = 'SG' AND id LIKE '26G%'
+        WHERE serie = 'SG'
+          AND tipo_atto IN ('LEGGE', 'DECRETO-LEGGE', 'DECRETO LEGISLATIVO', 'DECRETO')
         ORDER BY data_pubblicazione
     """).fetchall()
 
