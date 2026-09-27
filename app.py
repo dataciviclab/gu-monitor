@@ -7,6 +7,7 @@ Avvio:  streamlit run app.py
 from pathlib import Path
 
 import duckdb
+import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 import streamlit as st
@@ -29,7 +30,8 @@ def get_connection():
 
 
 def q(sql: str):
-    return get_connection().execute(sql).fetchdf()
+    result = get_connection().execute(sql).fetchdf()
+    return result if result is not None else pd.DataFrame()
 
 
 # ── Sidebar: filtri ──────────────────────────────────────────────────────────
