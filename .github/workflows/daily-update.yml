@@ -6,6 +6,10 @@ on:
     - cron: '0 6 * * *'
   workflow_dispatch:
 
+permissions:
+  contents: write
+  issues: write
+
 jobs:
   update:
     runs-on: ubuntu-latest
@@ -28,6 +32,11 @@ jobs:
 
       - name: Run analytics
         run: python scripts/analytics.py
+
+      - name: Alert alto impatto (ultime 24h)
+        run: python scripts/alert_high_impact.py
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Commit and push
         run: |

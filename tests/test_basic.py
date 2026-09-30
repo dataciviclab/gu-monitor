@@ -101,3 +101,86 @@ class TestAnalytics:
             assert result == 0
         finally:
             sys.argv = old_argv
+
+
+class TestAlertHighImpact:
+    """Test alert_high_impact script logic."""
+
+    @pytest.fixture
+    def parquet_path(self):
+        path = Path(__file__).parent.parent / "data" / "gu_acts.parquet"
+        if not path.exists():
+            pytest.skip("Parquet file not found")
+        return path
+
+    def test_alert_query_structure(self):
+        """Verify query filters only LEGGE/DECRETO-LEGGE."""
+        from alert_high_impact import QUERY
+        
+        # Query must filter by tipo_atto
+        assert "tipo_atto IN ('LEGGE', 'DECRETO-LEGGE')" in QUERY
+        # Must exclude regional
+        assert "NOT LIKE '%REGIONE%'" in QUERY
+        # Must use CURRENT_DATE for 24h window
+        assert "CURRENT_DATE" in QUERY
+
+    def test_alert_runs_with_real_data(self, parquet_path):
+        """Script runs without errors on real data."""
+        from alert_high_impact import main
+        
+        old_argv = sys.argv
+        sys.argv = ["alert_high_impact.py"]
+        try:
+            # Should return 0 even if no results today
+            result = main()
+            assert result == 0
+        finally:
+            sys.argv = old_argv
+
+    def test_alert_scoring_logic(self):
+        """Verify scoring weights in query."""
+        from alert_high_impact import QUERY
+        
+        # DECRETO-LEGGE should score higher than LEGGE
+        assert "WHEN tipo_atto = 'DECRETO-LEGGE' THEN 10" in QUERY
+        assert "WHEN tipo_atto = 'LEGGE' THEN 9" in QUERY
+        # PCM should have highest ente score
+        assert "%PRESIDENZA DEL CONSIGLIO%' THEN 4" in QUERY
+
+    def test_alert_excludes_regional(self, parquet_path):
+        """Query excludes regional legislation."""
+        import duckdb
+        from alert_high_impact import QUERY
+        
+        con = duckdb.connect(":memory:")
+        query = QUERY.format(
+            parquet=str(parquet_path.resolve()),
+            threshold=9
+        )
+        results = con.execute(query).fetchall()
+        con.close()
+        
+        # No regional acts should appear
+        for row in results:
+            ente = row[4] or ""
+            titolo = row[5] or ""
+            assert "REGIONE" not in ente.upper()
+            assert "PROVINCIA" not in ente.upper()
+            assert "REGIONALE" not in titolo.upper()
+
+    def test_alert_only_high_impact_types(self, parquet_path):
+        """Only LEGGE and DECRETO-LEGGE should appear."""
+        import duckdb
+        from alert_high_impact import QUERY
+        
+        con = duckdb.connect(":memory:")
+        query = QUERY.format(
+            parquet=str(parquet_path.resolve()),
+            threshold=9
+        )
+        results = con.execute(query).fetchall()
+        con.close()
+        
+        for row in results:
+            tipo = row[3]
+            assert tipo in ("LEGGE", "DECRETO-LEGGE")
