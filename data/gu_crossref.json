@@ -418,5 +418,25 @@
     "titolo_normattiva": "DECRETO-LEGGE 29 settembre 2026, n. 168",
     "sottotitolo": "Misure  urgenti  in  materia  di  giustizia,  di  funzionalita'   del\nMinistero  dell'interno  e  di  impianti  di   interesse   strategico\nnazionale. (26G00188)",
     "articolo_html": true
+  },
+  {
+    "id_gu": "26G00190",
+    "data_gu": "2026-09-30",
+    "titolo_gu": "DECRETO-LEGGE 30 settembre 2026, n. 170",
+    "tipo_atto": "LEGGE",
+    "urn": "urn:nir:stato:decreto.legge:2026-09-30;170",
+    "titolo_normattiva": "DECRETO-LEGGE 30 settembre 2026, n. 170",
+    "sottotitolo": "Misure urgenti per garantire il regolare avvio  dell'anno  scolastico\n2026/2027, per l'accompagnamento delle misure del Piano nazionale  di\nripresa   e   resilienza   (PNRR)   di   competenza   del   ",
+    "articolo_html": true
+  },
+  {
+    "id_gu": "26G00189",
+    "data_gu": "2026-09-30",
+    "titolo_gu": "LEGGE 29 settembre 2026, n. 169",
+    "tipo_atto": "LEGGE",
+    "urn": "urn:nir:stato:legge:2026-09-29;169",
+    "titolo_normattiva": "LEGGE 29 settembre 2026, n. 169",
+    "sottotitolo": "Delega  al  Governo  in  materia  di  energia  nucleare  sostenibile.\n(26G00189)",
+    "articolo_html": true
   }
 ]
