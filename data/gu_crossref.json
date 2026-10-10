@@ -498,5 +498,35 @@
     "titolo_normattiva": "DECRETO LEGISLATIVO 25 settembre 2026, n. 176",
     "sottotitolo": "Attuazione della direttiva (UE) 2024/1799 del  Parlamento  europeo  e\ndel  Consiglio,  del  13  giugno  2024,  recante  norme  comuni   che\npromuovono la riparazione dei beni. (26G00191)",
     "articolo_html": true
+  },
+  {
+    "id_gu": "26G00199",
+    "data_gu": "2026-10-08",
+    "titolo_gu": "DECRETO-LEGGE 8 ottobre 2026, n. 177",
+    "tipo_atto": "LEGGE",
+    "urn": "urn:nir:stato:decreto.legge:2026-10-08;177",
+    "titolo_normattiva": "DECRETO-LEGGE 8 ottobre 2026, n. 177",
+    "sottotitolo": "Disposizioni  urgenti  per   il   rafforzamento   delle   istruttorie\nambientali, la gestione dei problemi climatici, l'economia  circolare\ne le bonifiche. (26G00199)",
+    "articolo_html": true
+  },
+  {
+    "id_gu": "26G00192",
+    "data_gu": "2026-10-08",
+    "titolo_gu": "DECRETO LEGISLATIVO 25 settembre 2026, n. 178",
+    "tipo_atto": "DECRETO",
+    "urn": "urn:nir:stato:decreto.legislativo:2026-09-25;178",
+    "titolo_normattiva": "DECRETO LEGISLATIVO 25 settembre 2026, n. 178",
+    "sottotitolo": "Adeguamento  della  normativa   nazionale   alle   disposizioni   del\nregolamento delegato (UE) 2022/1644 della Commissione, del  7  luglio\n2022, che integra il regolamento (UE) 2017/625 del Parlament",
+    "articolo_html": true
+  },
+  {
+    "id_gu": "26G00200",
+    "data_gu": "2026-10-08",
+    "titolo_gu": "DECRETO LEGISLATIVO 7 ottobre 2026, n. 179",
+    "tipo_atto": "DECRETO",
+    "urn": "urn:nir:stato:decreto.legislativo:2026-10-07;179",
+    "titolo_normattiva": "DECRETO LEGISLATIVO 7 ottobre 2026, n. 179",
+    "sottotitolo": "Adeguamento  della  normativa   nazionale   alle   disposizioni   del\nregolamento (UE) 2024/1689 del Parlamento europeo  e  del  Consiglio,\ndel   13   giugno   2024,   che   stabilisce    regole    ar",
+    "articolo_html": true
   }
 ]
