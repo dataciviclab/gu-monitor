@@ -188,6 +188,10 @@
     "numero": "40"
   },
   {
+    "serie": "S1",
+    "numero": "41"
+  },
+  {
     "serie": "S2",
     "numero": "57"
   },
@@ -490,6 +494,10 @@
   {
     "serie": "S5",
     "numero": "116"
+  },
+  {
+    "serie": "S5",
+    "numero": "117"
   },
   {
     "serie": "S5",
@@ -842,5 +850,9 @@
   {
     "serie": "SG",
     "numero": "238"
+  },
+  {
+    "serie": "SG",
+    "numero": "239"
   }
 ]
