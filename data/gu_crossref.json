@@ -578,5 +578,25 @@
     "titolo_normattiva": "DECRETO LEGISLATIVO 25 settembre 2026, n. 184",
     "sottotitolo": "Recepimento della direttiva (UE) 2023/2864 del Parlamento  europeo  e\ndel Consiglio, del 13 dicembre 2023, e  adeguamento  dell'ordinamento\nnazionale alle disposizioni dei regolamenti  (UE)  2023/2859",
     "articolo_html": true
+  },
+  {
+    "id_gu": "26G00208",
+    "data_gu": "2026-10-16",
+    "titolo_gu": "DECRETO-LEGGE 16 ottobre 2026, n. 185",
+    "tipo_atto": "LEGGE",
+    "urn": "urn:nir:stato:decreto.legge:2026-10-16;185",
+    "titolo_normattiva": "DECRETO-LEGGE 16 ottobre 2026, n. 185",
+    "sottotitolo": "Misure urgenti a sostegno dei lavoratori dell'ex ILVA e  dell'indotto\ne per il rilancio industriale del territorio. (26G00208)",
+    "articolo_html": true
+  },
+  {
+    "id_gu": "26G00203",
+    "data_gu": "2026-10-16",
+    "titolo_gu": "DECRETO LEGISLATIVO 25 settembre 2026, n. 186",
+    "tipo_atto": "DECRETO",
+    "urn": "urn:nir:stato:decreto.legislativo:2026-09-25;186",
+    "titolo_normattiva": "DECRETO LEGISLATIVO 25 settembre 2026, n. 186",
+    "sottotitolo": "Attuazione della direttiva (UE) 2024/1260 del  Parlamento  europeo  e\ndel Consiglio, del 24 aprile  2024,  riguardante  il  recupero  e  la\nconfisca dei beni. (26G00203)",
+    "articolo_html": true
   }
 ]

@@ -81,6 +81,10 @@
   },
   {
     "serie": "P2",
+    "numero": "120"
+  },
+  {
+    "serie": "P2",
     "numero": "84"
   },
   {
@@ -338,6 +342,10 @@
   {
     "serie": "S3",
     "numero": "39"
+  },
+  {
+    "serie": "S3",
+    "numero": "40"
   },
   {
     "serie": "S4",
@@ -878,5 +886,9 @@
   {
     "serie": "SG",
     "numero": "241"
+  },
+  {
+    "serie": "SG",
+    "numero": "242"
   }
 ]
