@@ -93,6 +93,10 @@
   },
   {
     "serie": "P2",
+    "numero": "123"
+  },
+  {
+    "serie": "P2",
     "numero": "84"
   },
   {
@@ -368,6 +372,10 @@
     "numero": "40"
   },
   {
+    "serie": "S3",
+    "numero": "41"
+  },
+  {
     "serie": "S4",
     "numero": "56"
   },
@@ -472,6 +480,10 @@
     "numero": "81"
   },
   {
+    "serie": "S4",
+    "numero": "82"
+  },
+  {
     "serie": "S5",
     "numero": "100"
   },
@@ -554,6 +566,10 @@
   {
     "serie": "S5",
     "numero": "120"
+  },
+  {
+    "serie": "S5",
+    "numero": "121"
   },
   {
     "serie": "S5",
@@ -938,5 +954,13 @@
   {
     "serie": "SG",
     "numero": "246"
+  },
+  {
+    "serie": "SG",
+    "numero": "247"
+  },
+  {
+    "serie": "SG",
+    "numero": "248"
   }
 ]
