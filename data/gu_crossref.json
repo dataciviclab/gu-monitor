@@ -648,5 +648,35 @@
     "titolo_normattiva": "DECRETO LEGISLATIVO 1 ottobre 2026, n. 191",
     "sottotitolo": "Norme di adeguamento della normativa nazionale alle disposizioni  del\nregolamento (UE) 2025/37 del Parlamento europeo e del Consiglio,  del\n19 dicembre 2024, che  modifica  il  regolamento  (UE)  2019",
     "articolo_html": true
+  },
+  {
+    "id_gu": "26G00216",
+    "data_gu": "2026-10-23",
+    "titolo_gu": "DECRETO-LEGGE 23 ottobre 2026, n. 193",
+    "tipo_atto": "LEGGE",
+    "urn": "urn:nir:stato:decreto.legge:2026-10-23;193",
+    "titolo_normattiva": "DECRETO-LEGGE 23 ottobre 2026, n. 193",
+    "sottotitolo": "Disposizioni   urgenti   e   misure   di    sostegno    ai    settori\ndell'autotrasporto, dell'agricoltura e della pesca. (26G00216)",
+    "articolo_html": true
+  },
+  {
+    "id_gu": "26G00209",
+    "data_gu": "2026-10-23",
+    "titolo_gu": "LEGGE 13 ottobre 2026, n. 192",
+    "tipo_atto": "LEGGE",
+    "urn": "urn:nir:stato:legge:2026-10-13;192",
+    "titolo_normattiva": "LEGGE 13 ottobre 2026, n. 192",
+    "sottotitolo": "Dichiarazione di monumento nazionale del Palazzo Fortunato in Rionero\nin Vulture. (26G00209)",
+    "articolo_html": true
+  },
+  {
+    "id_gu": "26G00210",
+    "data_gu": "2026-10-24",
+    "titolo_gu": "DECRETO LEGISLATIVO 8 ottobre 2026, n. 194",
+    "tipo_atto": "DECRETO",
+    "urn": "urn:nir:stato:decreto.legislativo:2026-10-08;194",
+    "titolo_normattiva": "DECRETO LEGISLATIVO 8 ottobre 2026, n. 194",
+    "sottotitolo": "Attuazione della direttiva (UE) 2024/1069 del  Parlamento  europeo  e\ndel Consiglio, dell'11 aprile 2024, sulla  protezione  delle  persone\nattive  nella  partecipazione  pubblica  da  domande   manif",
+    "articolo_html": true
   }
 ]
