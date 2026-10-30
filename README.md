@@ -4,7 +4,7 @@
 
 La Gazzetta Ufficiale è il diario ufficiale dello Stato italiano. Ogni legge, ogni decreto, ogni bando di concorso passa da qui. Ma nessuno la monitora sistematicamente.
 
-Questo progetto lo fa: **2.784 atti unici**, 7 serie, 832 enti, 21 tipi di atto, 16 topic, tutto interrogabile.
+Questo progetto lo fa: **7.843 atti unici**, 7 serie, 1.529 enti, 21 tipi di atto, 16 topic, tutto interrogabile.
 
 [![CI](https://github.com/dataciviclab/gu-monitor/actions/workflows/ci.yml/badge.svg)](https://github.com/dataciviclab/gu-monitor/actions/workflows/ci.yml)
 [![Daily Update](https://github.com/dataciviclab/gu-monitor/actions/workflows/daily-update.yml/badge.svg)](https://github.com/dataciviclab/gu-monitor/actions/workflows/daily-update.yml)
@@ -35,13 +35,13 @@ docker run -p 8501:8501 gu-monitor
 
 | Metrica | Valore |
 |---|---|
-| Atti totali | **2.784** |
+| Atti totali | **7.843** |
 | Serie monitorate | **7** |
-| Enti rilevati | **832** |
+| Enti rilevati | **1.529** |
 | Tipi di atto | **21** |
 | Topic classificati | **16** |
-| Copertura topic | **64%** |
-| Peak day | **Martedì (141 atti/giorno)** |
+| Copertura topic | **61%** |
+| Peak day | **187 atti (10 settembre 2026)** |
 
 ---
 

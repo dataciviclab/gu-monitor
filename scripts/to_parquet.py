@@ -12,6 +12,8 @@ from pathlib import Path
 
 import duckdb
 
+NORMATTIVA_LINK = "https://www.normattiva.it/uri-res/N2Ls?"
+
 TOPIC_KEYWORDS = {
     "fisco": ["fiscale", "tributario", "tributi", "imposta", "irpef", "iva", "accisa",
               "bilancio", "rendicont"],
@@ -68,39 +70,41 @@ def enrich(data: list[dict]) -> list[dict]:
     return data
 
 
-def merge_normattiva_links(data: list[dict], data_dir: Path) -> list[dict]:
-    """Merge urn_normattiva and link_normattiva from gu_crossref.json into acts.
+def apply_crossref(con, table: str, crossref_file: Path) -> int:
+    """Applica gli URN di gu_crossref.json a TUTTE le righe di `table`.
 
-    Reads gu_crossref.json (produced by crossref.py) which contains
-    cross-reference results with URN and Normattiva metadata.
+    Deve girare dopo il merge con il parquet esistente: un URN scoperto
+    dopo il giorno di pubblicazione di un atto non arriverebbe mai al
+    dataset se l'update toccasse solo il JSON del run corrente (era il
+    caso: 71 lookup riusciti, 28 URN salvati).
     """
-    crossref_file = data_dir / "gu_crossref.json"
+    cols = {r[0] for r in con.execute(f"DESCRIBE {table}").fetchall()}
+    for col in ("urn_normattiva", "link_normattiva"):
+        if col not in cols:
+            con.execute(f"ALTER TABLE {table} ADD COLUMN {col} VARCHAR")
+
+    con.execute(
+        f"UPDATE {table} SET "
+        f"urn_normattiva = COALESCE(urn_normattiva, ''), "
+        f"link_normattiva = COALESCE(link_normattiva, '')"
+    )
 
     if not crossref_file.exists():
         print("gu_crossref.json non trovato — URN Normattiva non popolato")
-        return data
+        return 0
 
-    crossref = json.loads(crossref_file.read_text())
-    # crossref is a list of objects with id_gu key
-    lookup = {r["id_gu"]: r for r in crossref if r.get("id_gu")}
-    matched = 0
-    for a in data:
-        act_id = a.get("id", "")
-        if act_id in lookup:
-            cr = lookup[act_id]
-            urn = cr.get("urn", "")
-            if urn:
-                a["urn_normattiva"] = urn
-                a["link_normattiva"] = f"https://www.normattiva.it/uri-res/N2Ls?{urn}"
-                matched += 1
-            else:
-                a.setdefault("urn_normattiva", "")
-                a.setdefault("link_normattiva", "")
-        else:
-            a.setdefault("urn_normattiva", "")
-            a.setdefault("link_normattiva", "")
-    print(f"Normattiva URN:  {matched}/{len(data)} atti collegati")
-    return data
+    con.execute(
+        "CREATE OR REPLACE TABLE _crossref AS "
+        f"SELECT id_gu, urn FROM read_json_auto('{crossref_file}') "
+        "WHERE urn IS NOT NULL AND urn <> ''"
+    )
+    con.execute(
+        f"UPDATE {table} SET "
+        f"urn_normattiva = _crossref.urn, "
+        f"link_normattiva = '{NORMATTIVA_LINK}' || _crossref.urn "
+        f"FROM _crossref WHERE {table}.id = _crossref.id_gu"
+    )
+    return con.execute(f"SELECT count(*) FROM {table} WHERE urn_normattiva <> ''").fetchone()[0]
 
 
 def main():
@@ -114,7 +118,6 @@ def main():
 
     data = json.loads(json_file.read_text())
     data = enrich(data)
-    data = merge_normattiva_links(data, data_dir)
 
     # Reclassify ALTRO based on title keywords
     TIPO_TITLE_KEYWORDS = [
@@ -160,19 +163,6 @@ def main():
         for col in new_cols - existing_cols:
             con.execute(f"ALTER TABLE existing ADD COLUMN {col} VARCHAR")
 
-        # Backfill urn_normattiva and link_normattiva on existing rows from new_data
-        backfilled_cols = [c for c in ["urn_normattiva", "link_normattiva"] if c in new_cols]
-        if backfilled_cols:
-            set_clause = ", ".join(
-                f"{c} = COALESCE(NULLIF(existing.{c}, ''), new_data.{c})" for c in backfilled_cols
-            )
-            con.execute(f"""
-                UPDATE existing
-                SET {set_clause}
-                FROM new_data
-                WHERE existing.id = new_data.id AND existing.link = new_data.link
-            """)
-
         cols = sorted(existing_cols | new_cols)
         col_e = ", ".join([f"e.{c}" for c in cols])
         col_n = ", ".join([f"n.{c}" for c in cols])
@@ -194,6 +184,9 @@ def main():
         n_new = con.execute("SELECT COUNT(*) FROM merged").fetchone()[0]
         n_merged = n_new
         n_added = n_new
+
+    matched = apply_crossref(con, "merged", data_dir / "gu_crossref.json")
+    print(f"Normattiva URN:  {matched}/{n_merged} atti collegati")
 
     con.execute(f"COPY merged TO '{parquet_file}' (FORMAT PARQUET, COMPRESSION 'zstd')")
     tmp_file.unlink(missing_ok=True)

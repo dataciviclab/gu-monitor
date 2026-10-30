@@ -26,6 +26,68 @@ SERIE_30GG = {
     "P2": "/30giorni/parte_seconda",
 }
 
+# ── Classificazione tipo atto ──────────────────────────────────────────
+
+# Ordine = specificità decrescente. Il token match ignora i confini a
+# trattino, così "LEGGE" non intercetta "DECRETO-LEGGE" (bug storico che
+# classificava tutti i decreti-legge come leggi).
+TIPI_ATTO = [
+    "TESTO COORDINATO",
+    "DECRETO-LEGGE",
+    "DECRETO",
+    "LEGGE",
+    "DETERMINA",
+    "COMUNICATO",
+    "ORDINANZA",
+    "REGOLAMENTO",
+    "DECISIONE",
+    "RETTIFICA",
+    "AVVISO",
+    "GRADUATORIA",
+    "CONCORSO",
+    "AUTORIZZAZIONE",
+    "LIQUIDAZIONE",
+    "MODIFICA",
+    "REVOCA",
+    "VOLTURA",
+    "SOSTITUZIONE",
+    "RINUNCIA",
+    "CONFERIMENTO",
+    "CONVOCAZIONE",
+    "NOMINA",
+    "ISCRIZIONE",
+    "NOTIFICA",
+    "SENTENZA",
+    "DIARIO",
+    "ANNULLAMENTO",
+]
+
+
+def _match_token(text: str, phrase: str) -> bool:
+    """True se `phrase` compare come token intero (no lettere/trattini ai lati)."""
+    return re.search(rf"(?<![A-Z\-]){re.escape(phrase)}(?![A-Z])", text) is not None
+
+
+def classify_tipo(testo: str) -> str:
+    """Classifica il tipo atto dagli estremi ("DECRETO-LEGGE 23 luglio 2026")."""
+    upper = " ".join((testo or "").upper().split())
+    for tipo in TIPI_ATTO:
+        if _match_token(upper, tipo):
+            return tipo
+    return "ALTRO"
+
+
+def _pulisci_testo(testo: str) -> str:
+    """Normalizza il testo dell'atto togliendo la coda tecnica della pagina.
+
+    Es. "Regolamento ... (26G00215) Pag. 1" → "Regolamento ...".
+    """
+    pulito = " ".join((testo or "").split())
+    pulito = re.sub(r"\s*\(\s*[0-9A-Z]{6,20}\s*\)\s*(Pag\.\s*\d+)?\s*$", "", pulito)
+    pulito = re.sub(r"\s*Pag\.\s*\d+\s*$", "", pulito)
+    return pulito.strip(" -—")
+
+
 # ── Parsers ────────────────────────────────────────────────────────────
 
 class List30ggParser(HTMLParser):
@@ -78,6 +140,8 @@ class DetailParser(HTMLParser):
         self._current_ente = None
         self._in_link = False
         self._in_data_span = False
+        self._in_emettitore = False
+        self._emettitore_buf = ""
         self._current_act = {}
         self._buf = ""
         self._section = None  # current section header
@@ -86,6 +150,13 @@ class DetailParser(HTMLParser):
         d = dict(attrs)
         href = d.get("href", "")
         css_class = d.get("class", "")
+
+        # <span class="emettitore"> è l'ente che emana l'atto: fonte
+        # strutturata, da preferire all'euristica "testo tutto maiuscolo".
+        if tag == "span" and "emettitore" in css_class:
+            self._in_emettitore = True
+            self._emettitore_buf = ""
+            return
 
         if self.serie == "S2":
             # EU: detect <span class="risultato"> block
@@ -113,6 +184,10 @@ class DetailParser(HTMLParser):
         if not text:
             return
 
+        if self._in_emettitore:
+            self._emettitore_buf += text + " "
+            return
+
         # Section headers
         if hasattr(self, '_section') and self._section:
             self._section = None
@@ -126,8 +201,11 @@ class DetailParser(HTMLParser):
                 # Description text
                 self._buf += text + " "
         else:
-            # Original SG logic
-            if text.isupper() and len(text) > 10 and not text.startswith("n°"):
+            # Fallback: solo se l'ente non è già arrivato da <span class="emettitore">.
+            # Non sovrascrivere: in P2 il testo maiuscolo dentro l'anchor è il
+            # soggetto (società), non l'ente.
+            if (self._current_ente is None and text.isupper() and len(text) > 10
+                    and not text.startswith("n°")):
                 if any(kw in text for kw in ["LEGGI", "DECRETI", "DELIBERE", "ORDINANZE",
                                               "COMUNICATI", "ESTRATTI", "SUPPLEMENTI",
                                               "TESTI COORDINATI", "AVVISI"]):
@@ -139,6 +217,14 @@ class DetailParser(HTMLParser):
                 self._buf += text + " "
 
     def handle_endtag(self, tag):
+        if tag == "span" and self._in_emettitore:
+            self._in_emettitore = False
+            ente = " ".join(self._emettitore_buf.split())
+            if ente:
+                self._current_ente = ente
+            self._emettitore_buf = ""
+            return
+
         if self.serie == "S2" and tag == "span" and self._in_data_span:
             self._in_data_span = False
 
@@ -185,26 +271,40 @@ class DetailParser(HTMLParser):
         if self.serie != "S2" and self._in_link and tag == "a":
             self._in_link = False
             if self._current_act.get("codice"):
-                title = self._buf.strip()
-                tipo = "ALTRO"
-                for t in ["LEGGE", "DECRETO-LEGGE", "DECRETO", "DETERMINA", "COMUNICATO",
-                          "ORDINANZA", "REGOLAMENTO", "DECISIONE", "RETTIFICA",
-                          "TESTO COORDINATO", "AVVISO", "GRADUATORIA", "CONCORSO",
-                          "AUTORIZZAZIONE", "LIQUIDAZIONE", "MODIFICA", "REVOCA",
-                          "VOLTURA", "SOSTITUZIONE", "RINUNCIA", "CONFERIMENTO",
-                          "CONVOCAZIONE", "NOMINA", "ISCRIZIONE", "NOTIFICA",
-                          "SENTENZA", "DIARIO", "ANNULLAMENTO"]:
-                    if t in title.upper():
-                        tipo = t
-                        break
-
-                self._current_act["titolo"] = title
-                self._current_act["tipo_atto"] = tipo
-                self._current_act["ente"] = self._current_ente
-                self.acts.append(self._current_act)
+                self._append_act(
+                    self._current_act["codice"], _pulisci_testo(self._buf)
+                )
 
             self._current_act = {}
             self._buf = ""
+
+    def _append_act(self, codice: str, testo: str) -> bool:
+        """Aggiunge l'atto o arricchisce quello già visto. True se era un duplicato.
+
+        Ogni atto ha due anchor: il primo con gli estremi ("DECRETO 5 agosto
+        2026, n. 198"), il secondo con l'oggetto. `titolo` è l'oggetto; gli
+        estremi restano in `estremi` (servono a classificare il tipo e sono
+        l'unica descrizione disponibile per le inserzioni P2).
+        """
+        for existing in self.acts:
+            if existing.get("codice") == codice:
+                if not existing.get("estremi"):
+                    existing["estremi"] = testo
+                elif len(testo) > len(existing.get("oggetto", "")):
+                    existing["oggetto"] = testo
+                existing["titolo"] = existing.get("oggetto") or existing.get("estremi", "")
+                if not existing.get("ente") and self._current_ente:
+                    existing["ente"] = self._current_ente
+                return True
+
+        act = dict(self._current_act)
+        act["estremi"] = testo
+        act["oggetto"] = ""
+        act["titolo"] = testo
+        act["tipo_atto"] = classify_tipo(testo)
+        act["ente"] = self._current_ente
+        self.acts.append(act)
+        return False
 
 
 # ── Fetch helpers ──────────────────────────────────────────────────────
@@ -278,6 +378,7 @@ def fetch_detail(pub: dict) -> list[dict]:
             "gazzetta_numero": pub["numero"],
             "data_pubblicazione": pub["data"],
             "titolo": a.get("titolo", ""),
+            "estremi": a.get("estremi", ""),
             "tipo_atto": a.get("tipo_atto", "ALTRO"),
             "ente": a.get("ente"),
             "link": link,
@@ -373,7 +474,13 @@ def main():
         print(f"\n{len(failures)} errori durante lo scraping:")
         for serie, pub, err in failures:
             print(f"  [{serie}] {pub}: {err}")
-        return 1
+        # Un errore parziale non deve buttare via gli atti raccolti: le
+        # pubblicazioni fallite restano fuori da processed.json e vengono
+        # ritentate al run successivo. Si esce non-zero solo se non c'è
+        # nulla da salvare.
+        if not merged:
+            return 1
+        print("  Run parziale: gli atti raccolti vengono salvati comunque.")
 
     return 0
 

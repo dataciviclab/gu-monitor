@@ -32,16 +32,21 @@ dataset:
         description: Data di pubblicazione
       - name: titolo
         type: string
-        description: Titolo o descrizione dell'atto
+        description: Oggetto dell'atto (dal secondo anchor della pagina di dettaglio)
+      - name: estremi
+        type: string
+        description: >
+          Estremi dell'atto come pubblicati ("DECRETO 5 agosto 2026, n. 198";
+          per le inserzioni P2 è il soggetto, es. la società)
       - name: tipo_atto
         type: string
-        description: Tipo classificato (21 valori)
+        description: Tipo classificato (21 valori, da match a token intero sugli estremi)
       - name: ente
         type: string
-        description: Ente emittente
+        description: Ente emittente (da span.emettitore)
       - name: link
         type: string
-        description: URL permanente GU
+        description: URL della pagina di dettaglio GU (parametri stabili per atto)
       - name: topic_str
         type: string
         description: Topic classificati (separati da virgola)
@@ -74,6 +79,7 @@ datasets:
       - gazzetta_numero: string
       - data_pubblicazione: date
       - titolo: string
+      - estremi: string
       - tipo_atto: string
       - ente: string
       - link: string
