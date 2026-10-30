@@ -1,0 +1,198 @@
+{
+  "schema_version": 1,
+  "repo": "gu-monitor",
+  "source_repo": "dataciviclab/gu-monitor",
+  "updated_at": "2026-10-30",
+  "datasets": [
+    {
+      "slug": "gu_atti",
+      "name": "Gu Atti",
+      "description": "Atti pubblicati sulla Gazzetta Ufficiale della Repubblica Italiana, nelle 7 serie (Serie Generale, Corte Costituzionale, Unione Europea, Regioni, Concorsi, Contratti Pubblici, Parte II). Un record per atto, con estremi, oggetto, ente emittente e URN NIR quando l'atto è normativo.\n",
+      "source": "",
+      "source_id": "gazzetta_ufficiale",
+      "period": {
+        "start": 2026,
+        "end": 2026
+      },
+      "tags": [
+        "diritto",
+        "normativa",
+        "gazzetta-ufficiale",
+        "atti-pubblici",
+        "monitoraggio"
+      ],
+      "category": "normativa",
+      "columns": [
+        {
+          "name": "id",
+          "type": "VARCHAR",
+          "role": "dimension",
+          "description": ""
+        },
+        {
+          "name": "serie",
+          "type": "VARCHAR",
+          "role": "dimension",
+          "description": ""
+        },
+        {
+          "name": "gazzetta_numero",
+          "type": "VARCHAR",
+          "role": "dimension",
+          "description": ""
+        },
+        {
+          "name": "data_pubblicazione",
+          "type": "DATE",
+          "role": "dimension",
+          "description": ""
+        },
+        {
+          "name": "anno",
+          "type": "INTEGER",
+          "role": "dimension",
+          "description": "",
+          "semantic_type": "year"
+        },
+        {
+          "name": "titolo",
+          "type": "VARCHAR",
+          "role": "dimension",
+          "description": ""
+        },
+        {
+          "name": "estremi",
+          "type": "VARCHAR",
+          "role": "dimension",
+          "description": ""
+        },
+        {
+          "name": "tipo_atto",
+          "type": "VARCHAR",
+          "role": "dimension",
+          "description": ""
+        },
+        {
+          "name": "ente",
+          "type": "VARCHAR",
+          "role": "dimension",
+          "description": ""
+        },
+        {
+          "name": "topic_str",
+          "type": "VARCHAR",
+          "role": "dimension",
+          "description": ""
+        },
+        {
+          "name": "urn_normattiva",
+          "type": "VARCHAR",
+          "role": "dimension",
+          "description": ""
+        },
+        {
+          "name": "link",
+          "type": "VARCHAR",
+          "role": "dimension",
+          "description": ""
+        }
+      ],
+      "location": {
+        "type": "gcs",
+        "path": "gs://dataciviclab-clean/gu-monitor/gu_atti/2026/gu_atti_2026_clean.parquet",
+        "multi_file": false
+      },
+      "stage": "incubating",
+      "mart_refs": [
+        "gu_atti__mart_atti_per_serie_giorno",
+        "gu_atti__mart_atti_per_tipo",
+        "gu_atti__mart_normativi_urn"
+      ]
+    }
+  ],
+  "marts": [
+    {
+      "slug": "gu_atti__mart_atti_per_serie_giorno",
+      "dataset": "gu_atti",
+      "table": "mart_atti_per_serie_giorno",
+      "location": {
+        "type": "gcs",
+        "path": "gs://dataciviclab-mart/gu-monitor/gu_atti/2026/mart_atti_per_serie_giorno.parquet",
+        "multi_file": false
+      }
+    },
+    {
+      "slug": "gu_atti__mart_atti_per_tipo",
+      "dataset": "gu_atti",
+      "table": "mart_atti_per_tipo",
+      "location": {
+        "type": "gcs",
+        "path": "gs://dataciviclab-mart/gu-monitor/gu_atti/2026/mart_atti_per_tipo.parquet",
+        "multi_file": false
+      }
+    },
+    {
+      "slug": "gu_atti__mart_normativi_urn",
+      "dataset": "gu_atti",
+      "table": "mart_normativi_urn",
+      "location": {
+        "type": "gcs",
+        "path": "gs://dataciviclab-mart/gu-monitor/gu_atti/2026/mart_normativi_urn.parquet",
+        "multi_file": false
+      }
+    }
+  ],
+  "signals": [
+    {
+      "id": "gu_atti",
+      "source_id": "gazzetta_ufficiale",
+      "status": "ok",
+      "label": "gu_atti",
+      "detail": "anno 2026 — mart: si",
+      "action": "",
+      "run": {
+        "run_id": "20261030T141518Z_5bdbf757",
+        "year": 2026,
+        "status": "SUCCESS",
+        "quality_score": {
+          "raw": 100,
+          "clean": 95,
+          "mart": 100
+        },
+        "output_rows": {
+          "clean": 25711,
+          "mart": 999
+        },
+        "output_bytes": {
+          "raw": 1017238,
+          "clean": 1015003,
+          "mart": 23331
+        },
+        "started_at": "2026-10-30T14:15:18.276262+00:00",
+        "finished_at": "2026-10-30T14:15:18.547201+00:00",
+        "duration_seconds": 0.271
+      }
+    }
+  ],
+  "codelists": [],
+  "entities": {
+    "entities": {
+      "Tempo": {
+        "entity": "Tempo",
+        "label": "Tempo / data",
+        "datasets": [
+          {
+            "slug": "gu_atti",
+            "name": "Gu Atti",
+            "column": "anno",
+            "semantic_type": "year"
+          }
+        ],
+        "types": {
+          "year": 1
+        }
+      }
+    },
+    "bridges": []
+  }
+}
