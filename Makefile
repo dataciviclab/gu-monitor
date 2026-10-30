@@ -5,6 +5,25 @@ TOOLKIT = toolkit
 
 DATASETS := $(shell find datasets -name dataset.yml 2>/dev/null | sort)
 
+# Event log e cache URN: fuori da git, su GCS. La lettura è pubblica (HTTPS),
+# la scrittura richiede auth (job di ingest in CI).
+GCS_STORE ?= gs://dataciviclab-clean/gu-monitor/_event_log
+STORE_URL ?= https://storage.googleapis.com/dataciviclab-clean/gu-monitor/_event_log/gu_acts.parquet
+CROSSREF_URL ?= https://storage.googleapis.com/dataciviclab-clean/gu-monitor/_event_log/gu_crossref.json
+
+.PHONY: store-pull
+store-pull:
+	@mkdir -p data
+	@curl -fsSL "$(STORE_URL)" -o data/gu_acts.parquet && echo "store: scaricato" \
+		|| echo "store: assente, si riparte dal locale"
+	@curl -fsSL "$(CROSSREF_URL)" -o data/gu_crossref.json && echo "crossref: scaricato" \
+		|| echo "crossref: assente"
+
+.PHONY: store-push
+store-push:
+	@gcloud storage cp data/gu_acts.parquet $(GCS_STORE)/gu_acts.parquet --quiet
+	@gcloud storage cp data/gu_crossref.json $(GCS_STORE)/gu_crossref.json --quiet
+
 .PHONY: ingest
 ingest:
 	@python scripts/capture.py
@@ -22,9 +41,9 @@ run:
 .PHONY: run-all
 run-all: run
 
-# Cattura + pipeline: quello che gira ogni notte.
+# Cattura + pipeline: quello che gira ogni notte in CI.
 .PHONY: daily
-daily: ingest run
+daily: store-pull ingest store-push run
 
 .PHONY: check
 check:

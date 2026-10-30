@@ -47,7 +47,10 @@ docker run -p 8501:8501 gu-monitor
 
 ## Dataset
 
-Il cuore è `data/gu_acts.parquet`: un singolo file Parquet con tutti gli atti unici. Il dataset è cumulativo e cresce con il daily update. Chiave: `id` (codice redazionale).
+Il cuore è l'**event log**: un singolo Parquet con tutti gli atti unici, tenuto su
+`gs://dataciviclab-clean/gu-monitor/_event_log/` (non in git). In locale lo scarichi
+con `make store-pull`. Chiave: `id` (codice redazionale). Il dataset pubblicato è
+invece `gs://dataciviclab-clean/gu-monitor/gu_atti/<anno>/`.
 
 | Colonna | Tipo | Descrizione |
 |---|---|---|
@@ -129,29 +132,36 @@ python scripts/to_parquet.py --rebuild --input data/gu_atti_rebuild.json
 
 ## Automazione
 
-Due workflow, per due responsabilità diverse:
+**L'event log vive su GCS, non in git**:
+`gs://dataciviclab-clean/gu-monitor/_event_log/`. La lettura è pubblica (HTTPS),
+la scrittura richiede auth. Così la storia del repo non cresce di ~1 MB al giorno.
 
-**`daily-update.yml`** — cattura (ogni giorno alle 06:00 UTC):
+**`daily-update.yml`** (ogni giorno alle 06:00 UTC), due job:
 
-1. **Cattura incrementale** — dal watermark dell'event log all'archivio annuale.
-   Dopo un fermo recupera da sola l'intero buco, senza job di riparazione.
-2. Applica il delta all'event log (upsert per `id`).
-3. Cross-reference Normattiva e riapplica gli URN.
-4. Commit automatico se ci sono novità.
+1. `ingest` — scarica l'event log, cattura il delta dal watermark, cross-reference
+   Normattiva, ricarica l'event log su GCS.
+2. `build` — `toolkit run` → clean → mart, `verify_clean.py`, sync su
+   `gs://dataciviclab-{clean,mart}/gu-monitor/gu_atti/<anno>/`, registry via PR draft.
+
+Un terzo job `esito` rende il run rosso se la cattura ha avuto errori — dopo aver
+salvato e pubblicato quello che si è riusciti a prendere.
 
 Costo tipico: ~3 richieste HTTP per un giorno normale, ~14 per la finestra di
-sovrapposizione (3 giorni). Un fallimento parziale salva comunque gli atti
-raccolti e rende il run rosso alla fine.
+sovrapposizione (3 giorni).
 
-**`pipeline.yml`** — build (dopo il commit dell'event log, o a mano):
+**`pipeline.yml`** — solo per ricostruire a mano o quando cambia `datasets/**` o
+`sql/**`. Il build quotidiano è dentro `daily-update.yml`.
 
-1. `toolkit run` → raw → clean → mart (nessuna rete)
-2. `verify_clean.py` → il build non può produrre zero righe restando verde
-3. sync su `gs://dataciviclab-{clean,mart}/gu-monitor/gu_atti/<anno>/`
-4. registry aggiornato via PR draft
+Comandi locali:
 
-Comandi locali: `make ingest` (rete), `make run` (build), `make daily` (tutto),
-`make check` (config), `make test`, `make rebuild ANNO=2026`.
+```bash
+make store-pull   # scarica event log + cache URN da GCS
+make ingest       # cattura (rete) e aggiorna l'event log
+make run          # build raw -> clean -> mart
+make daily        # pull + ingest + push + build
+make check        # config toolkit
+make rebuild ANNO=2026
+```
 
 ---
 
@@ -161,8 +171,8 @@ Comandi locali: `make ingest` (rete), `make run` (build), `make daily` (tutto),
 gu-monitor/
 ├── .github/workflows/
 │   ├── ci.yml                # lint + test + config check
-│   ├── daily-update.yml      # cattura (rete → event log)
-│   └── pipeline.yml          # build (event log → clean/mart → GCS/registry)
+│   ├── daily-update.yml      # cattura + build (GCS → clean/mart)
+│   └── pipeline.yml          # rebuild manuale / su modifica pipeline
 ├── .streamlit/
 │   └── config.toml           # Tema dashboard
 ├── datasets/gu-atti/
@@ -179,7 +189,7 @@ gu-monitor/
 ├── tests/
 │   └── test_*.py             # 44 test
 ├── data/
-│   └── gu_acts.parquet       # Event log (contratto temporaneo con legal-graph)
+│   └── (event log e cache URN: scaricati da GCS, mai in git)
 ├── Makefile                  # ingest / run / daily / check / rebuild
 ├── app.py                    # Dashboard Streamlit
 ├── Dockerfile                # Container deploy
