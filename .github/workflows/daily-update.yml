@@ -1,10 +1,18 @@
-name: Daily Update
+name: Aggiornamento giornaliero
+
+# Cattura incrementale della Gazzetta Ufficiale.
+# Il cursore è il watermark dell'event log (max data_pubblicazione): non esiste
+# più uno stato per pubblicazione, quindi un fermo si recupera da solo.
 
 on:
   schedule:
-    # Every day at 06:00 UTC
     - cron: '0 6 * * *'
   workflow_dispatch:
+
+# Due run sovrapposti scriverebbero lo stesso parquet: si accodano.
+concurrency:
+  group: gu-monitor-ingest
+  cancel-in-progress: false
 
 jobs:
   update:
@@ -17,22 +25,37 @@ jobs:
       - name: Set up Python
         uses: dataciviclab/.github/actions/python-setup@main
 
-      - name: Scrape 30-day archive
-        run: python scripts/scrape_30gg.py
+      # Un errore parziale non deve buttare via gli atti raccolti: il delta
+      # viene scritto e applicato, il job diventa rosso alla fine.
+      - name: Cattura incrementale
+        id: capture
+        continue-on-error: true
+        run: python scripts/capture.py
+
+      - name: Applica il delta all'event log
+        run: python scripts/to_parquet.py --input data/gu_atti_delta.json
 
       - name: Cross-reference Normattiva (URN)
         run: python scripts/crossref.py
 
-      - name: Convert to Parquet
-        run: python scripts/to_parquet.py
+      # Secondo passaggio: applica gli URN trovati anche agli atti appena entrati.
+      - name: Riapplica il delta con gli URN
+        run: python scripts/to_parquet.py --input data/gu_atti_delta.json
 
-      - name: Run analytics
+      - name: Report analytics
         run: python scripts/analytics.py
 
-      - name: Commit and push
+      - name: Commit e push
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add data/
-          git diff --cached --quiet || git commit -m "Daily update $(date -u +%Y-%m-%d)"
+          git diff --cached --quiet || git commit -m "Daily update $(date -u +%Y-%m-%d) [skip ci]"
           git push
+
+      # Il run resta rosso se la cattura ha avuto errori, ma dopo aver salvato.
+      - name: Esito cattura
+        if: steps.capture.outcome == 'failure'
+        run: |
+          echo "::error::Cattura parziale o fallita — vedi il log dello step 'Cattura incrementale'"
+          exit 1

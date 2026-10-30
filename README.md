@@ -104,25 +104,42 @@ GROUP BY serie ORDER BY media DESC;
 ```bash
 pip install -r requirements.txt
 
-# Fetch incrementale 30gg
-python scripts/scrape_30gg.py
+# Cattura incrementale (watermark → archivio)
+python scripts/capture.py
 
-# Converti in Parquet (dedup su id, append incrementale)
-python scripts/to_parquet.py
+# Applica il delta all'event log (dedup su id)
+python scripts/to_parquet.py --input data/gu_atti_delta.json
+
+# Cross-reference Normattiva (URN) e riapplica
+python scripts/crossref.py
+python scripts/to_parquet.py --input data/gu_atti_delta.json
 
 # Analytics
 python scripts/analytics.py
+```
+
+Ricostruzione di un anno intero (manutenzione, non cron):
+
+```bash
+python scripts/rebuild_archivio.py --anno 2026
+python scripts/to_parquet.py --rebuild --input data/gu_atti_rebuild.json
 ```
 
 ---
 
 ## Automazione
 
-Il workflow GitHub Actions `daily-update.yml` esegue ogni giorno alle 06:00 UTC:
+Il workflow `daily-update.yml` esegue ogni giorno alle 06:00 UTC:
 
-1. Scraping archivio 30gg (tutte le 7 serie)
-2. Conversione in Parquet (dedup su id)
-3. Commit automatico se ci sono novità
+1. **Cattura incrementale** — dal watermark dell'event log all'archivio annuale.
+   Dopo un fermo recupera da sola l'intero buco, senza job di riparazione.
+2. Applica il delta all'event log (upsert per `id`).
+3. Cross-reference Normattiva e riapplica gli URN.
+4. Commit automatico se ci sono novità.
+
+Costo tipico: ~3 richieste HTTP per un giorno normale, ~14 per la finestra di
+sovrapposizione (3 giorni). Un fallimento parziale salva comunque gli atti
+raccolti e rende il run rosso alla fine.
 
 ---
 
@@ -136,10 +153,11 @@ gu-monitor/
 ├── .streamlit/
 │   └── config.toml           # Tema dashboard
 ├── scripts/
-│   ├── fetch_rss.py          # RSS → JSON
-│   ├── classify.py           # Enrich: ente, tipo, topic
-│   ├── scrape_30gg.py        # Scraper archivio 30gg
-│   ├── to_parquet.py         # JSON → Parquet
+│   ├── gu_source.py          # Fonte: URL, fetch, parser (unico punto)
+│   ├── capture.py            # Cattura incrementale a watermark
+│   ├── rebuild_archivio.py   # Ricostruzione per anno
+│   ├── to_parquet.py         # JSON → Parquet (event log)
+│   ├── crossref.py           # URN Normattiva
 │   └── analytics.py          # Report DuckDB
 ├── tests/
 │   └── test_basic.py         # 10 test

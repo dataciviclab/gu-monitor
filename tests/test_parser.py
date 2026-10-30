@@ -13,7 +13,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "scripts"))
 
-from scrape_30gg import DetailParser, classify_tipo  # noqa: E402
+from gu_source import DetailParser, ListPubblicazioniParser, classify_tipo  # noqa: E402
 
 PAGINA_SG = """
 <html><body>
@@ -65,9 +65,8 @@ PAGINA_P2 = """
 """
 
 
-class TestListArchivioParser:
+class TestListPubblicazioniParser:
     def test_estrae_data_e_numero_senza_duplicati(self):
-        from rebuild_archivio import ListArchivioParser
 
         html = """
         <a href="/gazzetta/serie_generale/caricaDettaglio?dataPubblicazioneGazzetta=2026-01-02&numeroGazzetta=1">x</a>
@@ -75,7 +74,7 @@ class TestListArchivioParser:
         <a href="/gazzetta/serie_generale/caricaDettaglio?dataPubblicazioneGazzetta=2026-01-03&numeroGazzetta=2">y</a>
         <a href="/altro/link">z</a>
         """
-        parser = ListArchivioParser()
+        parser = ListPubblicazioniParser()
         parser.feed(html)
 
         assert parser.pubs == [
@@ -113,7 +112,7 @@ class TestClassifyTipo:
 
 class TestPuliziaTesto:
     def test_toglie_codice_e_pagina(self):
-        from scrape_30gg import _pulisci_testo
+        from gu_source import _pulisci_testo
 
         assert (
             _pulisci_testo("Regolamento in attuazione dell'articolo 12. (26G00215) Pag. 1")
@@ -121,12 +120,12 @@ class TestPuliziaTesto:
         )
 
     def test_toglie_solo_pagina(self):
-        from scrape_30gg import _pulisci_testo
+        from gu_source import _pulisci_testo
 
         assert _pulisci_testo("Avviso di cessione di crediti Pag. 2") == "Avviso di cessione di crediti"
 
     def test_non_tocca_parentesi_descrittive(self):
-        from scrape_30gg import _pulisci_testo
+        from gu_source import _pulisci_testo
 
         assert _pulisci_testo("Decreto (testo coordinato)") == "Decreto (testo coordinato)"
 

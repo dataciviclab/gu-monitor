@@ -172,11 +172,17 @@ def main(argv: list[str] | None = None):
         action="store_true",
         help="le righe del JSON sostituiscono quelle esistenti con lo stesso id",
     )
+    ap.add_argument(
+        "--input",
+        default=None,
+        help="JSON di input (default data/gu_atti_delta.json)",
+    )
+    ap.add_argument("--store", default=None, help="parquet di output (default data/gu_acts.parquet)")
     args = ap.parse_args(argv)
 
     data_dir = Path(__file__).parent.parent / "data"
-    json_file = data_dir / "gu_acts_30gg.json"
-    parquet_file = data_dir / "gu_acts.parquet"
+    json_file = Path(args.input) if args.input else data_dir / "gu_atti_delta.json"
+    parquet_file = Path(args.store) if args.store else data_dir / "gu_acts.parquet"
 
     if not json_file.exists():
         print(f"Errore: {json_file} non trovato", file=sys.stderr)
