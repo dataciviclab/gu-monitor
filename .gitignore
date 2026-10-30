@@ -3,6 +3,7 @@ data/gu_acts.json
 data/gu_acts_classified.json
 data/gu_acts_30gg.json
 data/_tmp_*.json
+data/_rebuild_*.jsonl
 
 # Local notes
 _local/

@@ -8,7 +8,16 @@ dataset:
     Aggiornamento giornaliero via scraping archivio 30gg.
   source: Gazzetta Ufficiale — https://www.gazzettaufficiale.it
   source_url: https://www.gazzettaufficiale.it
-  license: MIT
+  license: >
+    Dati: Gazzetta Ufficiale della Repubblica Italiana (IPZS). La fonte dichiara
+    che la riproduzione dei testi elettronici è consentita purché venga menzionata
+    la fonte e il carattere non autentico e gratuito. Codice del repo: MIT.
+  attribution: >
+    Fonte: Gazzetta Ufficiale della Repubblica Italiana — www.gazzettaufficiale.it
+  disclaimer: >
+    I testi riprodotti non sono autentici: l'unico testo definitivo è quello
+    pubblicato sulla Gazzetta Ufficiale a mezzo stampa, che prevale in caso di
+    discordanza.
 
   coverage:
     period_start: null  # accumula dal primo run
@@ -57,7 +66,7 @@ dataset:
         type: string
         description: URN NIR (identificativo permanente)
 
-    key_fields: [id, link]
+    key_fields: [id]
 
   tags:
     - gazzetta-ufficiale

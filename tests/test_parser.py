@@ -65,6 +65,25 @@ PAGINA_P2 = """
 """
 
 
+class TestListArchivioParser:
+    def test_estrae_data_e_numero_senza_duplicati(self):
+        from rebuild_archivio import ListArchivioParser
+
+        html = """
+        <a href="/gazzetta/serie_generale/caricaDettaglio?dataPubblicazioneGazzetta=2026-01-02&numeroGazzetta=1">x</a>
+        <a href="/gazzetta/serie_generale/caricaDettaglio?dataPubblicazioneGazzetta=2026-01-02&numeroGazzetta=1">x</a>
+        <a href="/gazzetta/serie_generale/caricaDettaglio?dataPubblicazioneGazzetta=2026-01-03&numeroGazzetta=2">y</a>
+        <a href="/altro/link">z</a>
+        """
+        parser = ListArchivioParser()
+        parser.feed(html)
+
+        assert parser.pubs == [
+            {"data": "2026-01-02", "numero": "1"},
+            {"data": "2026-01-03", "numero": "2"},
+        ]
+
+
 class TestClassifyTipo:
     def test_decreto_legge_non_diventa_legge(self):
         assert classify_tipo("DECRETO-LEGGE 23 luglio 2026, n. 127") == "DECRETO-LEGGE"

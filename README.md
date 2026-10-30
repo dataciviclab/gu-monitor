@@ -4,7 +4,7 @@
 
 La Gazzetta Ufficiale è il diario ufficiale dello Stato italiano. Ogni legge, ogni decreto, ogni bando di concorso passa da qui. Ma nessuno la monitora sistematicamente.
 
-Questo progetto lo fa: **7.843 atti unici**, 7 serie, 1.529 enti, 21 tipi di atto, 16 topic, tutto interrogabile.
+Questo progetto lo fa: **25.711 atti unici**, 7 serie, 648 enti, 21 tipi di atto, 16 topic, tutto interrogabile.
 
 [![CI](https://github.com/dataciviclab/gu-monitor/actions/workflows/ci.yml/badge.svg)](https://github.com/dataciviclab/gu-monitor/actions/workflows/ci.yml)
 [![Daily Update](https://github.com/dataciviclab/gu-monitor/actions/workflows/daily-update.yml/badge.svg)](https://github.com/dataciviclab/gu-monitor/actions/workflows/daily-update.yml)
@@ -35,19 +35,19 @@ docker run -p 8501:8501 gu-monitor
 
 | Metrica | Valore |
 |---|---|
-| Atti totali | **7.843** |
+| Atti totali | **25.711** |
 | Serie monitorate | **7** |
-| Enti rilevati | **1.529** |
+| Enti rilevati | **648** |
 | Tipi di atto | **21** |
 | Topic classificati | **16** |
-| Copertura topic | **61%** |
-| Peak day | **187 atti (10 settembre 2026)** |
+| Copertura topic | **79%** |
+| Peak day | **275 atti (28 aprile 2026)** |
 
 ---
 
 ## Dataset
 
-Il cuore è `data/gu_acts.parquet`: un singolo file Parquet con tutti gli atti unici. Il dataset è cumulativo e cresce con il daily update. Chiave: `(id, link)`.
+Il cuore è `data/gu_acts.parquet`: un singolo file Parquet con tutti gli atti unici. Il dataset è cumulativo e cresce con il daily update. Chiave: `id` (codice redazionale).
 
 | Colonna | Tipo | Descrizione |
 |---|---|---|
@@ -55,11 +55,21 @@ Il cuore è `data/gu_acts.parquet`: un singolo file Parquet con tutti gli atti u
 | `serie` | VARCHAR | SG / S1 / S2 / S3 / S4 / S5 / P2 |
 | `gazzetta_numero` | VARCHAR | Numero della pubblicazione |
 | `data_pubblicazione` | DATE | Data di pubblicazione |
-| `titolo` | VARCHAR | Titolo/descrizione dell'atto |
-| `tipo_atto` | VARCHAR | LEGGE / DECRETO / CONCORSO / etc (21 tipi) |
-| `ente` | VARCHAR | Ente emittente |
-| `link` | VARCHAR | URL permanente (ELI o PDF) |
+| `titolo` | VARCHAR | Oggetto dell'atto (dal secondo anchor della pagina GU) |
+| `estremi` | VARCHAR | Estremi come pubblicati (`DECRETO 5 agosto 2026, n. 198`) |
+| `tipo_atto` | VARCHAR | LEGGE / DECRETO-LEGGE / CONCORSO / etc (21 tipi) |
+| `ente` | VARCHAR | Ente emittente (`span.emettitore`) |
+| `link` | VARCHAR | URL della pagina di dettaglio GU |
 | `topic_str` | VARCHAR | Topic classificati (16 topic) |
+| `urn_normattiva` | VARCHAR | URN NIR per gli atti normativi (crossref API Normattiva) |
+
+---
+
+## Fonte e riuso
+
+Fonte: **Gazzetta Ufficiale della Repubblica Italiana** — [gazzettaufficiale.it](https://www.gazzettaufficiale.it).
+
+La fonte dichiara che la riproduzione dei testi elettronici è consentita **purché venga menzionata la fonte e il carattere non autentico e gratuito**. I testi riprodotti non sono autentici: **l'unico testo definitivo è quello pubblicato sulla Gazzetta a mezzo stampa**, che prevale in caso di discordanza. Il codice del repo è MIT.
 
 ---
 
@@ -97,7 +107,7 @@ pip install -r requirements.txt
 # Fetch incrementale 30gg
 python scripts/scrape_30gg.py
 
-# Converti in Parquet (dedup su id+link, append incrementale)
+# Converti in Parquet (dedup su id, append incrementale)
 python scripts/to_parquet.py
 
 # Analytics
@@ -111,7 +121,7 @@ python scripts/analytics.py
 Il workflow GitHub Actions `daily-update.yml` esegue ogni giorno alle 06:00 UTC:
 
 1. Scraping archivio 30gg (tutte le 7 serie)
-2. Conversione in Parquet (dedup su id+link)
+2. Conversione in Parquet (dedup su id)
 3. Commit automatico se ci sono novità
 
 ---

@@ -361,10 +361,13 @@ def fetch_30gg_list(serie: str) -> list[dict]:
     return pubs
 
 
-def fetch_detail(pub: dict) -> list[dict]:
-    """Fetch detail page for a publication, return list of acts."""
-    html = fetch(pub["url"])
-    parser = DetailParser(serie=pub["serie"])
+def atti_da_html(html: str, serie: str, numero: str, data: str) -> list[dict]:
+    """Parsa la pagina di dettaglio di una pubblicazione e restituisce gli atti.
+
+    Unico punto di verità per il formato record: usato sia dal collector
+    rolling 30gg sia dalla ricostruzione da archivio.
+    """
+    parser = DetailParser(serie=serie)
     parser.feed(html)
 
     acts = []
@@ -374,9 +377,9 @@ def fetch_detail(pub: dict) -> list[dict]:
             link = BASE + link
         acts.append({
             "id": a["codice"],
-            "serie": pub["serie"],
-            "gazzetta_numero": pub["numero"],
-            "data_pubblicazione": pub["data"],
+            "serie": serie,
+            "gazzetta_numero": numero,
+            "data_pubblicazione": data,
             "titolo": a.get("titolo", ""),
             "estremi": a.get("estremi", ""),
             "tipo_atto": a.get("tipo_atto", "ALTRO"),
@@ -385,6 +388,12 @@ def fetch_detail(pub: dict) -> list[dict]:
         })
 
     return acts
+
+
+def fetch_detail(pub: dict) -> list[dict]:
+    """Fetch detail page for a publication, return list of acts."""
+    html = fetch(pub["url"])
+    return atti_da_html(html, pub["serie"], pub["numero"], pub["data"])
 
 
 # ── Main ───────────────────────────────────────────────────────────────

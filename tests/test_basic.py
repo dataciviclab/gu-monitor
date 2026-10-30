@@ -59,7 +59,7 @@ class TestParquet:
         con.execute(f"CREATE TABLE atti AS SELECT * FROM read_parquet('{parquet_path}')")
 
         count = con.execute("SELECT COUNT(*) FROM atti").fetchone()[0]
-        assert count >= 1500  # At least 1500 unique acts from 30 days (after dedup on id+link)
+        assert count >= 1500  # At least 1500 unique acts from 30 days (after dedup on id)
 
     def test_parquet_date_range(self, parquet_path):
         con = duckdb.connect(":memory:")

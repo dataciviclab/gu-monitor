@@ -2,13 +2,14 @@
 """GU Monitor — Convert JSON → Parquet con append incrementale.
 
 Legge gu_acts_30gg.json, arricchisce con topic, e appende in gu_acts.parquet.
-Deduplica per (id, link) — la chiave naturale della Gazzetta.
+Deduplica per id (codice redazionale), univoco per atto.
 """
 
 import json
 import re
 import sys
 from pathlib import Path
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 import duckdb
 
@@ -52,11 +53,29 @@ def extract_topics(titolo: str, content: str = "") -> list[str]:
     ))
 
 
+def link_canonico(url: str) -> str:
+    """Toglie i parametri di navigazione dal link della pagina di dettaglio.
+
+    `elenco30giorni` vale true o false a seconda di come ci si arriva: non
+    identifica l'atto e rompeva la chiave di merge (2.077 duplicati sul
+    rebuild 2026).
+    """
+    if not url:
+        return url
+    parti = urlsplit(url)
+    params = [
+        (k, v) for k, v in parse_qsl(parti.query, keep_blank_values=True)
+        if k != "elenco30giorni"
+    ]
+    return urlunsplit((parti.scheme, parti.netloc, parti.path, urlencode(params), parti.fragment))
+
+
 def enrich(data: list[dict]) -> list[dict]:
     for a in data:
         d = a.get("data_pubblicazione", "")
         if re.match(r"\d{2}-\d{2}-\d{4}", d):
             a["data_pubblicazione"] = f"{d[6:]}-{d[3:5]}-{d[:2]}"
+        a["link"] = link_canonico(a.get("link", ""))
         topics = extract_topics(a.get("titolo", ""), a.get("content_snippet", ""))
         existing = a.get("topic", [])
         if isinstance(existing, str):
@@ -107,7 +126,54 @@ def apply_crossref(con, table: str, crossref_file: Path) -> int:
     return con.execute(f"SELECT count(*) FROM {table} WHERE urn_normattiva <> ''").fetchone()[0]
 
 
-def main():
+def merge_esistente_nuovo(con, rebuild: bool = False) -> None:
+    """Crea `merged` da `existing` e `new_data` (tabelle già presenti).
+
+    Incrementale: la riga esistente vince, il nuovo aggiunge solo gli assenti.
+    Rebuild: la riga ricostruita sostituisce quella esistente con la stessa
+    chiave id — serve a correggere i campi già salvati.
+    """
+    existing_cols = {r[0] for r in con.execute("DESCRIBE existing").fetchall()}
+    new_cols = {r[0] for r in con.execute("DESCRIBE new_data").fetchall()}
+    for col in existing_cols - new_cols:
+        con.execute(f"ALTER TABLE new_data ADD COLUMN {col} VARCHAR")
+    for col in new_cols - existing_cols:
+        con.execute(f"ALTER TABLE existing ADD COLUMN {col} VARCHAR")
+
+    cols = sorted(existing_cols | new_cols)
+    col_e = ", ".join([f"e.{c}" for c in cols])
+    col_n = ", ".join([f"n.{c}" for c in cols])
+    if rebuild:
+        con.execute(f"""
+            CREATE TABLE merged AS
+            SELECT {col_n} FROM new_data n
+            UNION ALL
+            SELECT {col_e} FROM existing e
+            LEFT JOIN new_data n ON n.id = e.id
+            WHERE n.id IS NULL
+        """)
+    else:
+        con.execute(f"""
+            CREATE TABLE merged AS
+            SELECT {col_e} FROM existing e
+            UNION ALL
+            SELECT {col_n} FROM new_data n
+            LEFT JOIN existing e ON n.id = e.id
+            WHERE e.id IS NULL
+        """)
+
+
+def main(argv: list[str] | None = None):
+    import argparse
+
+    ap = argparse.ArgumentParser(description="JSON GU -> parquet (append o rebuild)")
+    ap.add_argument(
+        "--rebuild",
+        action="store_true",
+        help="le righe del JSON sostituiscono quelle esistenti con lo stesso id",
+    )
+    args = ap.parse_args(argv)
+
     data_dir = Path(__file__).parent.parent / "data"
     json_file = data_dir / "gu_acts_30gg.json"
     parquet_file = data_dir / "gu_acts.parquet"
@@ -137,12 +203,13 @@ def main():
     if reclassified:
         print(f"Riclassificati:  {reclassified} atti da ALTRO")
 
-    # Deduplicate on (id, link)
+    # Deduplicate sull'id (codice redazionale), univoco per atto.
+    # Il link non è una chiave: porta il flag di navigazione elenco30giorni.
     seen = set()
     deduped = []
     for a in data:
-        key = (a.get("id", ""), a.get("link", ""))
-        if key not in seen:
+        key = a.get("id", "")
+        if key and key not in seen:
             seen.add(key)
             deduped.append(a)
     print(f"JSON caricati:   {len(data)}")
@@ -156,24 +223,7 @@ def main():
     if parquet_file.exists():
         con.execute(f"CREATE TABLE existing AS SELECT * FROM read_parquet('{parquet_file}')")
         con.execute(f"CREATE TABLE new_data AS SELECT * FROM read_json_auto('{tmp_file}')")
-        existing_cols = {r[0] for r in con.execute("DESCRIBE existing").fetchall()}
-        new_cols = {r[0] for r in con.execute("DESCRIBE new_data").fetchall()}
-        for col in existing_cols - new_cols:
-            con.execute(f"ALTER TABLE new_data ADD COLUMN {col} VARCHAR")
-        for col in new_cols - existing_cols:
-            con.execute(f"ALTER TABLE existing ADD COLUMN {col} VARCHAR")
-
-        cols = sorted(existing_cols | new_cols)
-        col_e = ", ".join([f"e.{c}" for c in cols])
-        col_n = ", ".join([f"n.{c}" for c in cols])
-        con.execute(f"""
-            CREATE TABLE merged AS
-            SELECT {col_e} FROM existing e
-            UNION ALL
-            SELECT {col_n} FROM new_data n
-            LEFT JOIN existing e ON n.id = e.id AND n.link = e.link
-            WHERE e.id IS NULL
-        """)
+        merge_esistente_nuovo(con, rebuild=args.rebuild)
         n_existing = con.execute("SELECT COUNT(*) FROM existing").fetchone()[0]
         n_new = con.execute("SELECT COUNT(*) FROM new_data").fetchone()[0]
         n_merged = con.execute("SELECT COUNT(*) FROM merged").fetchone()[0]

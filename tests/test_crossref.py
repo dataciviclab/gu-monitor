@@ -60,6 +60,21 @@ def test_senza_crossref_non_esplode(tmp_path, con):
     assert con.execute("SELECT urn_normattiva FROM merged").fetchone()[0] == ""
 
 
+def test_link_canonico_toglie_il_flag_di_navigazione():
+    from to_parquet import link_canonico
+
+    url = (
+        "https://www.gazzettaufficiale.it/atto/serie_generale/caricaDettaglioAtto/originario"
+        "?atto.dataPubblicazioneGazzetta=2026-07-22&atto.codiceRedazionale=26A03640"
+        "&elenco30giorni=true"
+    )
+    canonico = link_canonico(url)
+    assert "elenco30giorni" not in canonico
+    assert "codiceRedazionale=26A03640" in canonico
+    # idempotente
+    assert link_canonico(canonico) == canonico
+
+
 def test_filtro_normativi_non_dipende_dall_anno(con):
     """Il filtro deve prendere 27G* a gennaio: niente anno hardcoded."""
     from crossref import SQL_NORMATIVI
