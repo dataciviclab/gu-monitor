@@ -23,3 +23,8 @@ jobs:
 
       - name: Tests
         run: python -m pytest tests/ -v
+
+  config-check:
+    uses: dataciviclab/.github/.github/workflows/dataset-config-check-reusable.yml@main
+    with:
+      globs: "datasets"

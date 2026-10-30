@@ -129,7 +129,9 @@ python scripts/to_parquet.py --rebuild --input data/gu_atti_rebuild.json
 
 ## Automazione
 
-Il workflow `daily-update.yml` esegue ogni giorno alle 06:00 UTC:
+Due workflow, per due responsabilità diverse:
+
+**`daily-update.yml`** — cattura (ogni giorno alle 06:00 UTC):
 
 1. **Cattura incrementale** — dal watermark dell'event log all'archivio annuale.
    Dopo un fermo recupera da sola l'intero buco, senza job di riparazione.
@@ -141,6 +143,16 @@ Costo tipico: ~3 richieste HTTP per un giorno normale, ~14 per la finestra di
 sovrapposizione (3 giorni). Un fallimento parziale salva comunque gli atti
 raccolti e rende il run rosso alla fine.
 
+**`pipeline.yml`** — build (dopo il commit dell'event log, o a mano):
+
+1. `toolkit run` → raw → clean → mart (nessuna rete)
+2. `verify_clean.py` → il build non può produrre zero righe restando verde
+3. sync su `gs://dataciviclab-{clean,mart}/gu-monitor/gu_atti/<anno>/`
+4. registry aggiornato via PR draft
+
+Comandi locali: `make ingest` (rete), `make run` (build), `make daily` (tutto),
+`make check` (config), `make test`, `make rebuild ANNO=2026`.
+
 ---
 
 ## Struttura
@@ -148,26 +160,31 @@ raccolti e rende il run rosso alla fine.
 ```
 gu-monitor/
 ├── .github/workflows/
-│   ├── ci.yml                # CI: lint + test
-│   └── daily-update.yml      # Cron giornaliero
+│   ├── ci.yml                # lint + test + config check
+│   ├── daily-update.yml      # cattura (rete → event log)
+│   └── pipeline.yml          # build (event log → clean/mart → GCS/registry)
 ├── .streamlit/
 │   └── config.toml           # Tema dashboard
+├── datasets/gu-atti/
+│   ├── dataset.yml           # contratto toolkit
+│   └── sql/                  # clean + 3 mart
 ├── scripts/
 │   ├── gu_source.py          # Fonte: URL, fetch, parser (unico punto)
 │   ├── capture.py            # Cattura incrementale a watermark
 │   ├── rebuild_archivio.py   # Ricostruzione per anno
 │   ├── to_parquet.py         # JSON → Parquet (event log)
 │   ├── crossref.py           # URN Normattiva
+│   ├── verify_clean.py       # Guardia del build
 │   └── analytics.py          # Report DuckDB
 ├── tests/
-│   └── test_basic.py         # 10 test
+│   └── test_*.py             # 44 test
 ├── data/
-│   └── gu_acts.parquet       # Dataset cumulativo
+│   └── gu_acts.parquet       # Event log (contratto temporaneo con legal-graph)
+├── Makefile                  # ingest / run / daily / check / rebuild
 ├── app.py                    # Dashboard Streamlit
 ├── Dockerfile                # Container deploy
 ├── requirements.txt          # Dipendenze
 ├── pyproject.toml            # Project config
-├── dataset.yml               # Schema
 ├── schema.md                 # Documentazione schema
 └── README.md
 ```

@@ -357,6 +357,10 @@ def atti_da_html(html: str, serie: str, numero: str, data: str) -> list[dict]:
         link = a.get("url", "")
         if link and not link.startswith("http"):
             link = BASE + link
+        if not link:
+            # La serie UE (S2) elenca gli atti senza link per atto: si punta
+            # alla pagina della pubblicazione, che è comunque navigabile.
+            link = url_dettaglio(serie, {"data": data, "numero": numero})
         acts.append({
             "id": a["codice"],
             "serie": serie,

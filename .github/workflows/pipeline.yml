@@ -1,0 +1,35 @@
+name: Pipeline
+
+# Raw -> clean -> mart -> GCS -> registry (PR draft).
+# Gira dopo che l'ingest ha committato l'event log (push su data/), oppure a mano.
+# Non fa rete: il raw è il parquet dell'event log, la cattura sta in
+# daily-update.yml. Così un guasto della fonte non si confonde con un errore di build.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "data/gu_acts.parquet"
+      - "datasets/**"
+      - "sql/**"
+  workflow_dispatch:
+
+concurrency:
+  group: gu-monitor-pipeline
+  cancel-in-progress: false
+
+jobs:
+  pipeline:
+    permissions:
+      contents: write
+      pull-requests: write
+      id-token: write
+    uses: dataciviclab/.github/.github/workflows/pipeline-reusable.yml@main
+    with:
+      repo-slug: "gu-monitor"
+      run-command: "make run"
+      detect-paths: ""
+      install-extras: "dev,pipeline"
+      sync-pattern: "per-dataset"
+      verify-command: "python scripts/verify_clean.py"
+    secrets: inherit
