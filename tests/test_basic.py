@@ -91,6 +91,12 @@ class TestAnalytics:
     """Test analytics script runs without errors."""
 
     def test_analytics_runs(self, capsys):
+        # L'event log non è più in git: senza `make store-pull` lo smoke non ha
+        # dati su cui girare (stesso criterio degli altri test su parquet).
+        event_log = Path(__file__).parent.parent / "data" / "gu_acts.parquet"
+        if not event_log.exists():
+            pytest.skip("event log assente: esegui `make store-pull`")
+
         from analytics import main
 
         # Mock sys.argv
