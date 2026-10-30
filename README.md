@@ -4,7 +4,7 @@
 
 La Gazzetta Ufficiale è il diario ufficiale dello Stato italiano. Ogni legge, ogni decreto, ogni bando di concorso passa da qui. Ma nessuno la monitora sistematicamente.
 
-Questo progetto lo fa: **2.784 atti unici**, 7 serie, 832 enti, 21 tipi di atto, 16 topic, tutto interrogabile.
+Questo progetto lo fa: **25.711 atti unici**, 7 serie, 648 enti, 21 tipi di atto, 16 topic, tutto interrogabile.
 
 [![CI](https://github.com/dataciviclab/gu-monitor/actions/workflows/ci.yml/badge.svg)](https://github.com/dataciviclab/gu-monitor/actions/workflows/ci.yml)
 [![Daily Update](https://github.com/dataciviclab/gu-monitor/actions/workflows/daily-update.yml/badge.svg)](https://github.com/dataciviclab/gu-monitor/actions/workflows/daily-update.yml)
@@ -35,19 +35,19 @@ docker run -p 8501:8501 gu-monitor
 
 | Metrica | Valore |
 |---|---|
-| Atti totali | **2.784** |
+| Atti totali | **25.711** |
 | Serie monitorate | **7** |
-| Enti rilevati | **832** |
+| Enti rilevati | **648** |
 | Tipi di atto | **21** |
 | Topic classificati | **16** |
-| Copertura topic | **64%** |
-| Peak day | **Martedì (141 atti/giorno)** |
+| Copertura topic | **79%** |
+| Peak day | **275 atti (28 aprile 2026)** |
 
 ---
 
 ## Dataset
 
-Il cuore è `data/gu_acts.parquet`: un singolo file Parquet con tutti gli atti unici. Il dataset è cumulativo e cresce con il daily update. Chiave: `(id, link)`.
+Il cuore è `data/gu_acts.parquet`: un singolo file Parquet con tutti gli atti unici. Il dataset è cumulativo e cresce con il daily update. Chiave: `id` (codice redazionale).
 
 | Colonna | Tipo | Descrizione |
 |---|---|---|
@@ -55,11 +55,21 @@ Il cuore è `data/gu_acts.parquet`: un singolo file Parquet con tutti gli atti u
 | `serie` | VARCHAR | SG / S1 / S2 / S3 / S4 / S5 / P2 |
 | `gazzetta_numero` | VARCHAR | Numero della pubblicazione |
 | `data_pubblicazione` | DATE | Data di pubblicazione |
-| `titolo` | VARCHAR | Titolo/descrizione dell'atto |
-| `tipo_atto` | VARCHAR | LEGGE / DECRETO / CONCORSO / etc (21 tipi) |
-| `ente` | VARCHAR | Ente emittente |
-| `link` | VARCHAR | URL permanente (ELI o PDF) |
+| `titolo` | VARCHAR | Oggetto dell'atto (dal secondo anchor della pagina GU) |
+| `estremi` | VARCHAR | Estremi come pubblicati (`DECRETO 5 agosto 2026, n. 198`) |
+| `tipo_atto` | VARCHAR | LEGGE / DECRETO-LEGGE / CONCORSO / etc (21 tipi) |
+| `ente` | VARCHAR | Ente emittente (`span.emettitore`) |
+| `link` | VARCHAR | URL della pagina di dettaglio GU |
 | `topic_str` | VARCHAR | Topic classificati (16 topic) |
+| `urn_normattiva` | VARCHAR | URN NIR per gli atti normativi (crossref API Normattiva) |
+
+---
+
+## Fonte e riuso
+
+Fonte: **Gazzetta Ufficiale della Repubblica Italiana** — [gazzettaufficiale.it](https://www.gazzettaufficiale.it).
+
+La fonte dichiara che la riproduzione dei testi elettronici è consentita **purché venga menzionata la fonte e il carattere non autentico e gratuito**. I testi riprodotti non sono autentici: **l'unico testo definitivo è quello pubblicato sulla Gazzetta a mezzo stampa**, che prevale in caso di discordanza. Il codice del repo è MIT.
 
 ---
 
@@ -94,25 +104,54 @@ GROUP BY serie ORDER BY media DESC;
 ```bash
 pip install -r requirements.txt
 
-# Fetch incrementale 30gg
-python scripts/scrape_30gg.py
+# Cattura incrementale (watermark → archivio)
+python scripts/capture.py
 
-# Converti in Parquet (dedup su id+link, append incrementale)
-python scripts/to_parquet.py
+# Applica il delta all'event log (dedup su id)
+python scripts/to_parquet.py --input data/gu_atti_delta.json
+
+# Cross-reference Normattiva (URN) e riapplica
+python scripts/crossref.py
+python scripts/to_parquet.py --input data/gu_atti_delta.json
 
 # Analytics
 python scripts/analytics.py
+```
+
+Ricostruzione di un anno intero (manutenzione, non cron):
+
+```bash
+python scripts/rebuild_archivio.py --anno 2026
+python scripts/to_parquet.py --rebuild --input data/gu_atti_rebuild.json
 ```
 
 ---
 
 ## Automazione
 
-Il workflow GitHub Actions `daily-update.yml` esegue ogni giorno alle 06:00 UTC:
+Due workflow, per due responsabilità diverse:
 
-1. Scraping archivio 30gg (tutte le 7 serie)
-2. Conversione in Parquet (dedup su id+link)
-3. Commit automatico se ci sono novità
+**`daily-update.yml`** — cattura (ogni giorno alle 06:00 UTC):
+
+1. **Cattura incrementale** — dal watermark dell'event log all'archivio annuale.
+   Dopo un fermo recupera da sola l'intero buco, senza job di riparazione.
+2. Applica il delta all'event log (upsert per `id`).
+3. Cross-reference Normattiva e riapplica gli URN.
+4. Commit automatico se ci sono novità.
+
+Costo tipico: ~3 richieste HTTP per un giorno normale, ~14 per la finestra di
+sovrapposizione (3 giorni). Un fallimento parziale salva comunque gli atti
+raccolti e rende il run rosso alla fine.
+
+**`pipeline.yml`** — build (dopo il commit dell'event log, o a mano):
+
+1. `toolkit run` → raw → clean → mart (nessuna rete)
+2. `verify_clean.py` → il build non può produrre zero righe restando verde
+3. sync su `gs://dataciviclab-{clean,mart}/gu-monitor/gu_atti/<anno>/`
+4. registry aggiornato via PR draft
+
+Comandi locali: `make ingest` (rete), `make run` (build), `make daily` (tutto),
+`make check` (config), `make test`, `make rebuild ANNO=2026`.
 
 ---
 
@@ -121,25 +160,31 @@ Il workflow GitHub Actions `daily-update.yml` esegue ogni giorno alle 06:00 UTC:
 ```
 gu-monitor/
 ├── .github/workflows/
-│   ├── ci.yml                # CI: lint + test
-│   └── daily-update.yml      # Cron giornaliero
+│   ├── ci.yml                # lint + test + config check
+│   ├── daily-update.yml      # cattura (rete → event log)
+│   └── pipeline.yml          # build (event log → clean/mart → GCS/registry)
 ├── .streamlit/
 │   └── config.toml           # Tema dashboard
+├── datasets/gu-atti/
+│   ├── dataset.yml           # contratto toolkit
+│   └── sql/                  # clean + 3 mart
 ├── scripts/
-│   ├── fetch_rss.py          # RSS → JSON
-│   ├── classify.py           # Enrich: ente, tipo, topic
-│   ├── scrape_30gg.py        # Scraper archivio 30gg
-│   ├── to_parquet.py         # JSON → Parquet
+│   ├── gu_source.py          # Fonte: URL, fetch, parser (unico punto)
+│   ├── capture.py            # Cattura incrementale a watermark
+│   ├── rebuild_archivio.py   # Ricostruzione per anno
+│   ├── to_parquet.py         # JSON → Parquet (event log)
+│   ├── crossref.py           # URN Normattiva
+│   ├── verify_clean.py       # Guardia del build
 │   └── analytics.py          # Report DuckDB
 ├── tests/
-│   └── test_basic.py         # 10 test
+│   └── test_*.py             # 44 test
 ├── data/
-│   └── gu_acts.parquet       # Dataset cumulativo
+│   └── gu_acts.parquet       # Event log (contratto temporaneo con legal-graph)
+├── Makefile                  # ingest / run / daily / check / rebuild
 ├── app.py                    # Dashboard Streamlit
 ├── Dockerfile                # Container deploy
 ├── requirements.txt          # Dipendenze
 ├── pyproject.toml            # Project config
-├── dataset.yml               # Schema
 ├── schema.md                 # Documentazione schema
 └── README.md
 ```

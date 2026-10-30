@@ -13,6 +13,16 @@ from urllib.request import Request, urlopen
 
 BASE_URL = "https://api.normattiva.it/t/normattiva.api/bff-opendata/v1/api/v1"
 
+# Codice redazionale normativo = AAGG###### (es. 26G00151): il prefisso è
+# l'anno. Niente LIKE '26G%' hardcoded, altrimenti il crossref si spegne
+# il 1° gennaio.
+SQL_NORMATIVI = """
+    SELECT id, serie, data_pubblicazione, titolo, tipo_atto
+    FROM atti
+    WHERE serie = 'SG' AND regexp_matches(id, '^[0-9]{2}G')
+    ORDER BY data_pubblicazione
+"""
+
 
 def build_urn(tipo: str, anno: int, mese: int, giorno: int, numero: int) -> str:
     """Costruisce URN NIR da tipo, data, numero (formato Normattiva)."""
@@ -47,14 +57,21 @@ def normattiva_search(codice_redazionale: str, data_gu: str) -> dict | None:
     try:
         with urlopen(req, timeout=30) as resp:
             data = json.loads(resp.read())
-            if data.get("data", {}).get("atto"):
-                atto = data["data"]["atto"]
+            payload_data = data.get("data") or {}
+            atto = payload_data.get("atto")
+            if not atto:
+                # Alcuni atti (ripubblicazioni) tornano in data.lista
+                lista = payload_data.get("lista") or []
+                if isinstance(lista, list) and lista:
+                    atto = lista[0]
+            if atto:
                 # Build URN from data
                 tipo = atto.get("tipoProvvedimentoDescrizione", "")
                 anno = atto.get("annoProvvedimento")
                 mese = atto.get("meseProvvedimento")
                 giorno = atto.get("giornoProvvedimento")
                 numero = atto.get("numeroProvvedimento")
+                # numero 0/None = atto non numerato: l'URN ";0" non esiste
                 if anno and mese and giorno and numero:
                     atto["urn"] = build_urn(tipo, anno, mese, giorno, numero)
                 return atto
@@ -77,13 +94,10 @@ def main():
     con = duckdb.connect(":memory:")
     con.execute(f"CREATE TABLE atti AS SELECT * FROM read_parquet('{parquet_file}')")
 
-    # Get normativi (26G pattern — SG series normative acts)
-    atti = con.execute("""
-        SELECT id, serie, data_pubblicazione, titolo, tipo_atto
-        FROM atti
-        WHERE serie = 'SG' AND id LIKE '26G%'
-        ORDER BY data_pubblicazione
-    """).fetchall()
+    # Get normativi: codice redazionale nella forma AAGG###### (26G00151).
+    # Il prefisso è l'anno, quindi il filtro non va hardcoded sull'anno corrente
+    # (la vecchia condizione `id LIKE '26G%'` spegneva il crossref a gennaio).
+    atti = con.execute(SQL_NORMATIVI).fetchall()
 
     print(f"Trovati {len(atti)} atti normativi da incrociare")
 
@@ -118,7 +132,7 @@ def main():
                 "tipo_atto": tipo,
                 "urn": atto.get("urn", ""),
                 "titolo_normattiva": atto.get("titolo", ""),
-                "sottotitolo": atto.get("sottoTitolo", "").strip()[:200],
+                "sottotitolo": (atto.get("sottoTitolo") or "").strip()[:200],
                 "articolo_html": bool(atto.get("articoloHtml")),
             }
             results.append(result)
@@ -144,7 +158,7 @@ def main():
     output_file.write_text(json.dumps(list(existing.values()), indent=2, ensure_ascii=False))
 
     print(f"\n{'=' * 50}")
-    print(f"Attj processati: {len(atti)}")
+    print(f"Atti processati: {len(atti)}")
     print(f"Skipped (già fatti): {skipped}")
     print(f"Retry (precedentemente falliti): {retried}")
     print(f"Trovati su Normattiva: {found}")

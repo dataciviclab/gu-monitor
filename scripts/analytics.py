@@ -20,7 +20,7 @@ def main():
 
     # ── 1. Riepilogo per serie ──────────────────────────────────────
     print("=" * 60)
-    print("ATTI PER SERIE (30 giorni)")
+    print("ATTI PER SERIE (periodo coperto)")
     print("=" * 60)
     r = con.execute("""
         SELECT serie, COUNT(*) as n,

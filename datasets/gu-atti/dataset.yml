@@ -1,0 +1,91 @@
+root: ../../out
+schema_version: 1
+
+dataset:
+  name: gu_atti
+  source_id: gazzetta_ufficiale
+  tags: [diritto, normativa, gazzetta-ufficiale, atti-pubblici, monitoraggio]
+  category: normativa
+  license: >
+    Dati: Gazzetta Ufficiale della Repubblica Italiana (IPZS). Riproduzione
+    consentita con menzione della fonte e carattere non autentico/gratuito.
+    Codice del repo: MIT.
+  attribution: "Fonte: Gazzetta Ufficiale della Repubblica Italiana — www.gazzettaufficiale.it"
+  disclaimer: >
+    I testi riprodotti non sono autentici: l'unico testo definitivo è quello
+    pubblicato sulla Gazzetta Ufficiale a mezzo stampa, che prevale in caso di
+    discordanza.
+  description: >
+    Atti pubblicati sulla Gazzetta Ufficiale della Repubblica Italiana, nelle 7
+    serie (Serie Generale, Corte Costituzionale, Unione Europea, Regioni,
+    Concorsi, Contratti Pubblici, Parte II). Un record per atto, con estremi,
+    oggetto, ente emittente e URN NIR quando l'atto è normativo.
+  years:
+    - 2026
+  time_coverage:
+    start_year: 2026
+    end_year: 2026
+
+# Il raw è l'event log catturato da capture.py e tenuto in data/gu_acts.parquet.
+# Il toolkit non fa rete: la cattura è uno step separato (`make ingest`), così
+# un guasto della fonte non si confonde con un errore di build.
+raw:
+  output_policy: overwrite
+  sources:
+    - name: event_log
+      type: local_file
+      args:
+        path: ../../data/gu_acts.parquet
+        filename: gu_atti.parquet
+      primary: true
+
+clean:
+  read:
+    source: auto
+    mode: all
+  required_columns:
+    - id
+    - serie
+    - data_pubblicazione
+    - titolo
+    - tipo_atto
+  sql: sql/clean.sql
+  validate:
+    primary_key:
+      - id
+    not_null:
+      - id
+      - serie
+      - gazzetta_numero
+      - data_pubblicazione
+      - titolo
+      - tipo_atto
+    ranges:
+      anno:
+        min: 1861
+        max: 2100
+    min_rows: 1000
+
+mart:
+  tables:
+    - name: mart_atti_per_serie_giorno
+      sql: sql/mart_serie_giorno.sql
+    - name: mart_atti_per_tipo
+      sql: sql/mart_tipo.sql
+    - name: mart_normativi_urn
+      sql: sql/mart_normativi_urn.sql
+  required_tables:
+    - mart_atti_per_serie_giorno
+    - mart_atti_per_tipo
+    - mart_normativi_urn
+  validate:
+    table_rules:
+      mart_atti_per_serie_giorno:
+        required_columns: [serie, data_pubblicazione, atti]
+        min_rows: 100
+      mart_atti_per_tipo:
+        required_columns: [tipo_atto, atti]
+        min_rows: 10
+      mart_normativi_urn:
+        required_columns: [id, urn_normattiva]
+        min_rows: 1

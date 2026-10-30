@@ -15,7 +15,13 @@ dependencies = [
     "lab-connectors @ git+https://github.com/dataciviclab/lab-connectors.git",
 ]
 
+[tool.setuptools]
+packages = []
+
 [project.optional-dependencies]
+pipeline = [
+    "dataciviclab-toolkit @ git+https://github.com/dataciviclab/toolkit.git",
+]
 dashboard = [
     "streamlit>=1.35.0",
     "plotly>=5.18.0",
