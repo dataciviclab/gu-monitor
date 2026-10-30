@@ -152,6 +152,10 @@ sovrapposizione (3 giorni).
 **`pipeline.yml`** — solo per ricostruire a mano o quando cambia `datasets/**` o
 `sql/**`. Il build quotidiano è dentro `daily-update.yml`.
 
+**`rebuild.yml`** — backfill di uno o più anni dall'archivio (manuale, in CI:
+lo store su GCS lo scrive solo la pipeline). Dopo il backfill va aggiornato
+`years` in `datasets/gu-atti/dataset.yml` per pubblicare i nuovi anni.
+
 Comandi locali:
 
 ```bash
@@ -172,7 +176,8 @@ gu-monitor/
 ├── .github/workflows/
 │   ├── ci.yml                # lint + test + config check
 │   ├── daily-update.yml      # cattura + build (GCS → clean/mart)
-│   └── pipeline.yml          # rebuild manuale / su modifica pipeline
+│   ├── pipeline.yml          # rebuild manuale / su modifica pipeline
+│   └── rebuild.yml           # backfill storico (CI only)
 ├── .streamlit/
 │   └── config.toml           # Tema dashboard
 ├── datasets/gu-atti/
