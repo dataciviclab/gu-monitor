@@ -204,19 +204,35 @@ def applica_urn(con, table: str, risultati: list[tuple[str, str]]) -> int:
     return len(risultati)
 
 
-def crossref(con, table: str, sleep: float = 0.3) -> int:
-    """Risolve gli URN mancanti interrogando l'API Normattiva."""
+def crossref(con, table: str, sleep: float = 0.3, tentativi: int = 3) -> int:
+    """Risolve gli URN mancanti. I fallimenti sono spesso transitori (timeout),
+    quindi si ritentano prima di dichiararli persi."""
     pendenti = urn_pendenti(con, table)
     if not pendenti:
         return 0
     print(f"[urn] {len(pendenti)} atti normativi da risolvere")
+
     trovati = []
-    for codice, data_gu in pendenti:
-        urn = normattiva_search(codice, data_gu)
-        if urn:
-            trovati.append((codice, urn))
-        time.sleep(sleep)
+    rimasti = pendenti
+    for giro in range(1, tentativi + 1):
+        falliti = []
+        for codice, data_gu in rimasti:
+            urn = normattiva_search(codice, data_gu)
+            if urn:
+                trovati.append((codice, urn))
+            else:
+                falliti.append((codice, data_gu))
+            time.sleep(sleep)
+        rimasti = falliti
+        if not rimasti:
+            break
+        if giro < tentativi:
+            print(f"[urn] {len(rimasti)} falliti, ritento (giro {giro + 1}/{tentativi})")
+            time.sleep(2)
+
     print(f"[urn] risolti {len(trovati)}/{len(pendenti)}")
+    if rimasti:
+        print(f"[urn] ancora senza URN: {[c for c, _ in rimasti][:5]}")
     return applica_urn(con, table, trovati)
 
 
@@ -232,6 +248,8 @@ COLONNE = {
     "tipo_atto": "VARCHAR",
     "ente": "VARCHAR",
     "sezione": "VARCHAR",
+    "rubrica_raw": "VARCHAR",
+    "emittitore_raw": "VARCHAR",
     "link": "VARCHAR",
     "urn_normattiva": "VARCHAR",
     "link_normattiva": "VARCHAR",
@@ -280,6 +298,17 @@ def merge(con, store: Path, righe: list[dict], rebuild: bool) -> int:
             UNION ALL
             SELECT {sel_e} FROM existing e
             LEFT JOIN new_data n ON n.id = e.id WHERE n.id IS NULL
+        """)
+        # Il parser non conosce gli URN: senza questo, un rebuild cancella
+        # quelli gia' risolti e li deve rifare tutti (218 chiamate, e se una
+        # fallisce il dato peggiora invece di migliorare).
+        con.execute("""
+            UPDATE merged SET urn_normattiva = e.urn_normattiva,
+                              link_normattiva = e.link_normattiva
+            FROM existing e
+            WHERE merged.id = e.id
+              AND COALESCE(merged.urn_normattiva, '') = ''
+              AND COALESCE(e.urn_normattiva, '') <> ''
         """)
     else:
         con.execute(f"""
@@ -334,13 +363,14 @@ def main(argv: list[str] | None = None) -> int:
     for serie in SERIE:
         try:
             pubs: list[dict] = []
-            for anno in anni:
-                pubs += elenco_archivio(serie, anno)
-                richieste += 1
-            if not rebuild:
-                # La finestra 30gg copre un eventuale ritardo dell'archivio.
-                pubs += elenco_30gg(serie)
-                richieste += 1
+            # L'elenco annuale serve solo se la finestra esce dai 30 giorni
+            # (buco vero o backfill): in un giorno normale basta la finestra.
+            if rebuild or inizio < oggi - timedelta(days=30):
+                for anno in anni:
+                    pubs += elenco_archivio(serie, anno)
+                    richieste += 1
+            pubs += elenco_30gg(serie)
+            richieste += 1
         except Exception as e:  # noqa: BLE001
             print(f"[{serie}] elenco non disponibile: {e}")
             fallite.append((serie, "elenco", str(e)))

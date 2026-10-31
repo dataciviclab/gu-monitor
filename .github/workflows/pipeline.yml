@@ -14,7 +14,7 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: gu-monitor-pipeline
+  group: gu-monitor-store  # stesso oggetto GCS di daily e rebuild
   cancel-in-progress: false
 
 jobs:

@@ -26,6 +26,8 @@ store-push:
 store-backup:
 	@gcloud storage cp $(GCS_STORE)/gu_acts.parquet $(GCS_STORE)/gu_acts_prev.parquet --quiet \
 		&& echo "backup: gu_acts_prev.parquet" || echo "backup: store assente"
+	@gcloud storage cp $(GCS_STORE)/gu_acts.parquet \
+		$(GCS_STORE)/gu_acts_$(shell date -u +%Y%m%d).parquet --quiet || true
 
 .PHONY: ingest
 ingest:

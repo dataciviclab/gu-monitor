@@ -228,6 +228,10 @@ def atti_da_html(html: str, serie: str, numero: str, data: str) -> list[dict]:
             "tipo_atto": classify_tipo(estremi),
             "ente": ente or None,
             "sezione": sezione or None,
+            # Grezzi dalla pagina: restano nello store e non nel clean, cosi'
+            # un futuro cambio di parser e' un UPDATE SQL, non 755 richieste.
+            "rubrica_raw": rubrica or None,
+            "emittitore_raw": emettitore or None,
             "link": link,
         })
 

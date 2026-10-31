@@ -22,7 +22,7 @@ on:
         default: "0.6"
 
 concurrency:
-  group: gu-monitor-rebuild
+  group: gu-monitor-store  # daily e rebuild scrivono lo stesso oggetto: si serializzano
   cancel-in-progress: false
 
 jobs:
@@ -88,3 +88,22 @@ jobs:
 
       - name: Ricarica l'event log
         run: make store-push
+
+  # Il rebuild riscrive lo store; senza questo job la clean pubblicata resta
+  # quella vecchia (e verify_clean tiene il daily rosso) fino al run dopo.
+  build:
+    needs: rebuild
+    permissions:
+      contents: write
+      pull-requests: write
+      id-token: write
+    uses: dataciviclab/.github/.github/workflows/pipeline-reusable.yml@main
+    with:
+      repo-slug: "gu-monitor"
+      run-command: "make run"
+      pre-run-command: "make store-pull"
+      detect-paths: ""
+      install-extras: "dev,pipeline"
+      sync-pattern: "per-dataset"
+      verify-command: "python scripts/verify_clean.py"
+    secrets: inherit

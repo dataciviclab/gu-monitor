@@ -11,7 +11,7 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: gu-monitor-daily
+  group: gu-monitor-store  # daily e rebuild scrivono lo stesso oggetto: si serializzano
   cancel-in-progress: false
 
 jobs:
