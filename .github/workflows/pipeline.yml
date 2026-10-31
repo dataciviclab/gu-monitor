@@ -1,15 +1,14 @@
 name: Pipeline
 
 # Raw -> clean -> mart -> GCS -> registry (PR draft).
-# Gira dopo che l'ingest ha committato l'event log (push su data/), oppure a mano.
-# Non fa rete: il raw è il parquet dell'event log, la cattura sta in
-# daily-update.yml. Così un guasto della fonte non si confonde con un errore di build.
+# Il build gira di norma dentro daily-update.yml, dopo la cattura. Questo
+# workflow serve per ricostruire a mano o quando cambia il codice della pipeline.
+# Non fa rete: il raw è l'event log su GCS.
 
 on:
   push:
     branches: [main]
     paths:
-      - "data/gu_acts.parquet"
       - "datasets/**"
       - "sql/**"
   workflow_dispatch:
@@ -28,6 +27,7 @@ jobs:
     with:
       repo-slug: "gu-monitor"
       run-command: "make run"
+      pre-run-command: "make store-pull"
       detect-paths: ""
       install-extras: "dev,pipeline"
       sync-pattern: "per-dataset"

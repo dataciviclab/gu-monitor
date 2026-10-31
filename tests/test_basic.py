@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
-"""Tests for GU Monitor scripts."""
+"""Contratto dello store (schema, chiave, classificazioni).
+
+Non dipende dal file reale su GCS: costruisce uno store con `merge` e ne
+verifica la forma. Così il test gira anche in CI, dove l'event log non c'è.
+"""
 
 import sys
 from pathlib import Path
@@ -7,97 +11,75 @@ from pathlib import Path
 import duckdb
 import pytest
 
-# Add scripts to path
 sys.path.insert(0, str(Path(__file__).parent.parent / "scripts"))
 
-
-class TestExtractTopics:
-    """Test topic classification (now in to_parquet.py)."""
-
-    def test_extract_topics(self):
-        from to_parquet import extract_topics
-
-        assert "sanita" in extract_topics("Classificazione medicinale Comirnaty", "")
-        assert "lavoro" in extract_topics("Concorso pubblico per assistente", "")
-        assert "europa" in extract_topics("Regolamento (UE) 2026/1395", "")
-        assert "fisco" in extract_topics("Imposta sul redditi", "")
-        assert len(extract_topics("Test generico", "")) == 0
+from collect import COLONNE, merge, urn_pendenti  # noqa: E402
 
 
-class TestParquet:
-    """Test parquet dataset."""
-
-    @pytest.fixture
-    def parquet_path(self):
-        path = Path(__file__).parent.parent / "data" / "gu_acts.parquet"
-        if not path.exists():
-            pytest.skip("Parquet file not found")
-        return path
-
-    def test_parquet_exists(self, parquet_path):
-        assert parquet_path.exists()
-
-    def test_parquet_schema(self, parquet_path):
-        con = duckdb.connect(":memory:")
-        con.execute(f"CREATE TABLE atti AS SELECT * FROM read_parquet('{parquet_path}')")
-
-        columns = {row[0] for row in con.execute("DESCRIBE atti").fetchall()}
-        expected = {"id", "serie", "gazzetta_numero", "data_pubblicazione",
-                    "titolo", "tipo_atto", "ente", "link", "topic_str",
-                    "urn_normattiva", "link_normattiva"}
-        assert expected.issubset(columns)
-
-    def test_parquet_has_all_series(self, parquet_path):
-        con = duckdb.connect(":memory:")
-        con.execute(f"CREATE TABLE atti AS SELECT * FROM read_parquet('{parquet_path}')")
-
-        series = {row[0] for row in con.execute("SELECT DISTINCT serie FROM atti").fetchall()}
-        assert series == {"SG", "S1", "S2", "S3", "S4", "S5", "P2"}
-
-    def test_parquet_row_count(self, parquet_path):
-        con = duckdb.connect(":memory:")
-        con.execute(f"CREATE TABLE atti AS SELECT * FROM read_parquet('{parquet_path}')")
-
-        count = con.execute("SELECT COUNT(*) FROM atti").fetchone()[0]
-        assert count >= 1500  # At least 1500 unique acts from 30 days (after dedup on id)
-
-    def test_parquet_date_range(self, parquet_path):
-        con = duckdb.connect(":memory:")
-        con.execute(f"CREATE TABLE atti AS SELECT * FROM read_parquet('{parquet_path}')")
-
-        min_date = con.execute("SELECT MIN(data_pubblicazione) FROM atti").fetchone()[0]
-        max_date = con.execute("SELECT MAX(data_pubblicazione) FROM atti").fetchone()[0]
-        assert min_date is not None
-        assert max_date is not None
-        assert max_date >= min_date
-
-    def test_parquet_urn_normattiva(self, parquet_path):
-        con = duckdb.connect(":memory:")
-        con.execute(f"CREATE TABLE atti AS SELECT * FROM read_parquet('{parquet_path}')")
-
-        # All rows should have urn_normattiva column (possibly empty)
-        cols = {row[0] for row in con.execute("DESCRIBE atti").fetchall()}
-        assert "urn_normattiva" in cols
-        assert "link_normattiva" in cols
-
-        # Some rows should have non-empty URN (from gu_links.json crossref)
-        non_empty = con.execute(
-            "SELECT COUNT(*) FROM atti WHERE urn_normattiva IS NOT NULL AND urn_normattiva != ''"
-        ).fetchone()[0]
-        assert non_empty > 0
+def _riga(**override):
+    base = {
+        "id": "26G00151",
+        "serie": "SG",
+        "gazzetta_numero": "169",
+        "data_pubblicazione": "2026-07-23",
+        "titolo": "Misure urgenti",
+        "estremi": "DECRETO-LEGGE 23 luglio 2026, n. 127",
+        "tipo_atto": "DECRETO-LEGGE",
+        "ente": "PRESIDENZA DEL CONSIGLIO DEI MINISTRI",
+        "topic_str": "",
+        "link": "L1",
+        "urn_normattiva": None,
+        "link_normattiva": None,
+    }
+    base.update(override)
+    return base
 
 
-class TestAnalytics:
-    """Test analytics script runs without errors."""
+@pytest.fixture
+def con():
+    con = duckdb.connect()
+    yield con
+    con.close()
 
-    def test_analytics_runs(self, capsys):
-        from analytics import main
 
-        # Mock sys.argv
-        old_argv = sys.argv
-        sys.argv = ["analytics.py"]
-        try:
-            result = main()
-            assert result == 0
-        finally:
-            sys.argv = old_argv
+def test_lo_store_ha_esattamente_le_colonne_del_contratto(con, tmp_path):
+    merge(con, tmp_path / "store.parquet", [_riga()], rebuild=False)
+    colonne = [r[0] for r in con.execute("DESCRIBE merged").fetchall()]
+    assert colonne == list(COLONNE)
+
+
+def test_la_chiave_e_id(con, tmp_path):
+    store = tmp_path / "store.parquet"
+    con_a = duckdb.connect()
+    merge(con_a, store, [_riga()], rebuild=False)
+    con_a.execute(f"COPY merged TO '{store}' (FORMAT PARQUET)")
+    con_a.close()
+
+    merge(con, store, [_riga(titolo="titolo nuovo")], rebuild=True)
+    duplicati = con.execute(
+        "SELECT count(*) FROM (SELECT id FROM merged GROUP BY 1 HAVING count(*) > 1)"
+    ).fetchone()[0]
+    assert duplicati == 0
+
+
+def test_urn_solo_su_codici_normativi(con, tmp_path):
+    """La regola che protegge il ponte: solo AAGG###### può avere un URN."""
+    righe = [
+        _riga(id="26G00151", urn_normattiva="urn:nir:stato:decreto.legge:2026-07-23;127"),
+        _riga(id="26A00001", urn_normattiva=None),
+    ]
+    merge(con, tmp_path / "store.parquet", righe, rebuild=False)
+    sporchi = con.execute(
+        """SELECT count(*) FROM merged
+           WHERE urn_normattiva <> '' AND NOT regexp_matches(id, '^[0-9]{2}G')"""
+    ).fetchone()[0]
+    assert sporchi == 0
+
+
+def test_i_pendenti_escludono_chi_ha_gia_l_urn(con, tmp_path):
+    righe = [
+        _riga(id="26G00151"),
+        _riga(id="26G00152", urn_normattiva="urn:nir:stato:legge:2026-07-16;129"),
+    ]
+    merge(con, tmp_path / "store.parquet", righe, rebuild=False)
+    assert [r[0] for r in urn_pendenti(con, "merged")] == ["26G00151"]

@@ -1,0 +1,79 @@
+name: Ricostruzione storica
+
+# Backfill di uno o più anni dall'archivio della Gazzetta.
+#
+# Gira SOLO in CI: lo store su GCS lo scrive la pipeline, mai una macchina
+# locale. Il risultato è riproducibile dal workflow, non da uno script lanciato
+# a mano.
+#
+# Dopo il backfill i dati sono su GCS ma non ancora pubblicati: per vedere i
+# nuovi anni in clean/mart va aggiornato `years` in datasets/gu-atti/dataset.yml
+# (una PR: il push su datasets/** fa partire pipeline.yml).
+
+on:
+  workflow_dispatch:
+    inputs:
+      anni:
+        description: "Anni: singolo (2025) o intervallo (2019-2025)"
+        required: true
+      sleep:
+        description: "Pausa fra richieste in secondi (cortesia verso la fonte)"
+        required: false
+        default: "0.6"
+
+concurrency:
+  group: gu-monitor-rebuild
+  cancel-in-progress: false
+
+jobs:
+  rebuild:
+    runs-on: ubuntu-latest
+    # Un anno ≈ 40 minuti: il tetto tiene margine per un intervallo ampio.
+    timeout-minutes: 360
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: dataciviclab/.github/actions/python-setup@main
+
+      - name: GCP Auth (store su GCS)
+        uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+
+      - name: Set up gcloud
+        uses: google-github-actions/setup-gcloud@v3
+
+      - name: Scarica l'event log
+        run: make store-pull
+
+      - name: Ricostruisci gli anni richiesti
+        env:
+          ANNI: ${{ inputs.anni }}
+          SLEEP: ${{ inputs.sleep }}
+        run: |
+          set -euo pipefail
+          python scripts/collect.py --anni "$ANNI" --sleep "$SLEEP"
+
+      - name: Verifica copertura per anno
+        run: |
+          python - <<'PY'
+          import duckdb
+          con = duckdb.connect()
+          print(con.execute("""
+              SELECT substr(CAST(data_pubblicazione AS VARCHAR), 1, 4) AS anno,
+                     count(*) AS atti,
+                     count(*) FILTER (WHERE urn_normattiva <> '') AS con_urn
+              FROM read_parquet('data/gu_acts.parquet')
+              GROUP BY 1 ORDER BY 1
+          """).fetchall())
+          PY
+
+      - name: Ricarica l'event log
+        run: make store-push

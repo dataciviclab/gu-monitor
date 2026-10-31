@@ -5,12 +5,24 @@ TOOLKIT = toolkit
 
 DATASETS := $(shell find datasets -name dataset.yml 2>/dev/null | sort)
 
+# Event log e cache URN: fuori da git, su GCS. La lettura è pubblica (HTTPS),
+# la scrittura richiede auth (job di ingest in CI).
+GCS_STORE ?= gs://dataciviclab-clean/gu-monitor/_event_log
+STORE_URL ?= https://storage.googleapis.com/dataciviclab-clean/gu-monitor/_event_log/gu_acts.parquet
+
+.PHONY: store-pull
+store-pull:
+	@mkdir -p data
+	@curl -fsSL "$(STORE_URL)" -o data/gu_acts.parquet && echo "store: scaricato" \
+		|| echo "store: assente, si riparte dal locale"
+
+.PHONY: store-push
+store-push:
+	@gcloud storage cp data/gu_acts.parquet $(GCS_STORE)/gu_acts.parquet --quiet
+
 .PHONY: ingest
 ingest:
-	@python scripts/capture.py
-	@python scripts/to_parquet.py --input data/gu_atti_delta.json
-	@python scripts/crossref.py
-	@python scripts/to_parquet.py --input data/gu_atti_delta.json
+	@python scripts/collect.py
 
 .PHONY: run
 run:
@@ -22,9 +34,9 @@ run:
 .PHONY: run-all
 run-all: run
 
-# Cattura + pipeline: quello che gira ogni notte.
+# Giro completo in locale. NON pubblica su GCS: lo store lo scrive solo la CI.
 .PHONY: daily
-daily: ingest run
+daily: store-pull ingest run
 
 .PHONY: check
 check:
@@ -41,9 +53,8 @@ test:
 
 .PHONY: rebuild
 rebuild:
-	@test -n "$(ANNO)" || (echo "uso: make rebuild ANNO=2026" && exit 1)
-	@python scripts/rebuild_archivio.py --anno $(ANNO)
-	@python scripts/to_parquet.py --rebuild --input data/gu_atti_rebuild.json
+	@test -n "$(ANNI)" || (echo "uso: make rebuild ANNI=2025" && exit 1)
+	@python scripts/collect.py --anni $(ANNI)
 
 .PHONY: registry registry-write
 registry:

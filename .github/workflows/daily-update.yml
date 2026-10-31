@@ -1,22 +1,27 @@
 name: Aggiornamento giornaliero
 
-# Cattura incrementale della Gazzetta Ufficiale.
-# Il cursore è il watermark dell'event log (max data_pubblicazione): non esiste
-# più uno stato per pubblicazione, quindi un fermo si recupera da solo.
+# Cattura incrementale della Gazzetta Ufficiale + build.
+# L'event log vive su GCS (non in git): il job lo scarica, applica il delta e
+# lo ricarica. Il build gira dopo, come job separato, così un guasto della
+# fonte non si confonde con un errore di pipeline.
 
 on:
   schedule:
     - cron: '0 6 * * *'
   workflow_dispatch:
 
-# Due run sovrapposti scriverebbero lo stesso parquet: si accodano.
 concurrency:
-  group: gu-monitor-ingest
+  group: gu-monitor-daily
   cancel-in-progress: false
 
 jobs:
-  update:
+  ingest:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    outputs:
+      cattura: ${{ steps.capture.outcome }}
 
     steps:
       - name: Checkout
@@ -25,37 +30,56 @@ jobs:
       - name: Set up Python
         uses: dataciviclab/.github/actions/python-setup@main
 
+      - name: GCP Auth (store su GCS)
+        uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+
+      - name: Set up gcloud
+        uses: google-github-actions/setup-gcloud@v3
+
+      - name: Scarica l'event log
+        run: make store-pull
+
       # Un errore parziale non deve buttare via gli atti raccolti: il delta
-      # viene scritto e applicato, il job diventa rosso alla fine.
+      # viene scritto e applicato, il run diventa rosso alla fine.
       - name: Cattura incrementale
         id: capture
         continue-on-error: true
-        run: python scripts/capture.py
+        run: make ingest
 
-      - name: Applica il delta all'event log
-        run: python scripts/to_parquet.py --input data/gu_atti_delta.json
+      - name: Ricarica l'event log
+        if: always()
+        run: make store-push
 
-      - name: Cross-reference Normattiva (URN)
-        run: python scripts/crossref.py
+  build:
+    needs: ingest
+    if: always() && needs.ingest.result != 'cancelled'
+    permissions:
+      contents: write
+      pull-requests: write
+      id-token: write
+    uses: dataciviclab/.github/.github/workflows/pipeline-reusable.yml@main
+    with:
+      repo-slug: "gu-monitor"
+      run-command: "make run"
+      pre-run-command: "make store-pull"
+      detect-paths: ""
+      install-extras: "dev,pipeline"
+      sync-pattern: "per-dataset"
+      verify-command: "python scripts/verify_clean.py"
+    secrets: inherit
 
-      # Secondo passaggio: applica gli URN trovati anche agli atti appena entrati.
-      - name: Riapplica il delta con gli URN
-        run: python scripts/to_parquet.py --input data/gu_atti_delta.json
-
-      - name: Report analytics
-        run: python scripts/analytics.py
-
-      - name: Commit e push
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add data/
-          git diff --cached --quiet || git commit -m "Daily update $(date -u +%Y-%m-%d) [skip ci]"
-          git push
-
-      # Il run resta rosso se la cattura ha avuto errori, ma dopo aver salvato.
+  # Il run resta rosso se la cattura ha avuto errori, ma dopo aver salvato
+  # e pubblicato quello che si è riusciti a prendere.
+  esito:
+    needs: [ingest, build]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
       - name: Esito cattura
-        if: steps.capture.outcome == 'failure'
+        if: needs.ingest.outputs.cattura == 'failure'
         run: |
-          echo "::error::Cattura parziale o fallita — vedi il log dello step 'Cattura incrementale'"
+          echo "::error::Cattura parziale o fallita — vedi il log del job ingest"
           exit 1
