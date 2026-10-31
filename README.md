@@ -107,25 +107,17 @@ GROUP BY serie ORDER BY media DESC;
 ```bash
 pip install -r requirements.txt
 
-# Cattura incrementale (watermark → archivio)
-python scripts/capture.py
+# Cattura incrementale + URN + merge nello store
+python scripts/collect.py
 
-# Applica il delta all'event log (dedup su id)
-python scripts/to_parquet.py --input data/gu_atti_delta.json
-
-# Cross-reference Normattiva (URN) e riapplica
-python scripts/crossref.py
-python scripts/to_parquet.py --input data/gu_atti_delta.json
-
-# Analytics
-python scripts/analytics.py
+# Backfill di un anno (o intervallo)
+python scripts/collect.py --anni 2025
 ```
 
 Ricostruzione di un anno intero (manutenzione, non cron):
 
 ```bash
-python scripts/rebuild_archivio.py --anno 2026
-python scripts/to_parquet.py --rebuild --input data/gu_atti_rebuild.json
+python scripts/collect.py --anni 2025
 ```
 
 ---
@@ -185,12 +177,8 @@ gu-monitor/
 │   └── sql/                  # clean + 3 mart
 ├── scripts/
 │   ├── gu_source.py          # Fonte: URL, fetch, parser (unico punto)
-│   ├── capture.py            # Cattura incrementale a watermark
-│   ├── rebuild_archivio.py   # Ricostruzione per anno
-│   ├── to_parquet.py         # JSON → Parquet (event log)
-│   ├── crossref.py           # URN Normattiva
-│   ├── verify_clean.py       # Guardia del build
-│   └── analytics.py          # Report DuckDB
+│   ├── collect.py            # Store: incrementale e backfill + URN
+│   └── verify_clean.py       # Guardia del build
 ├── tests/
 │   └── test_*.py             # 44 test
 ├── data/

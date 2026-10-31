@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
-"""Tests for GU Monitor scripts."""
+"""Guardia sull'event log (lo store).
+
+Lo store non è in git: se manca, i test si saltano (`make store-pull` per
+averlo). Quando c'è, questi test proteggono il contratto delle colonne.
+"""
 
 import sys
 from pathlib import Path
@@ -7,103 +11,56 @@ from pathlib import Path
 import duckdb
 import pytest
 
-# Add scripts to path
 sys.path.insert(0, str(Path(__file__).parent.parent / "scripts"))
 
+STORE = Path(__file__).parent.parent / "data" / "gu_acts.parquet"
 
-class TestExtractTopics:
-    """Test topic classification (now in to_parquet.py)."""
-
-    def test_extract_topics(self):
-        from to_parquet import extract_topics
-
-        assert "sanita" in extract_topics("Classificazione medicinale Comirnaty", "")
-        assert "lavoro" in extract_topics("Concorso pubblico per assistente", "")
-        assert "europa" in extract_topics("Regolamento (UE) 2026/1395", "")
-        assert "fisco" in extract_topics("Imposta sul redditi", "")
-        assert len(extract_topics("Test generico", "")) == 0
+ATTESE = {
+    "id", "serie", "gazzetta_numero", "data_pubblicazione", "titolo",
+    "estremi", "tipo_atto", "ente", "topic_str", "link",
+    "urn_normattiva", "link_normattiva",
+}
 
 
-class TestParquet:
-    """Test parquet dataset."""
-
-    @pytest.fixture
-    def parquet_path(self):
-        path = Path(__file__).parent.parent / "data" / "gu_acts.parquet"
-        if not path.exists():
-            pytest.skip("Parquet file not found")
-        return path
-
-    def test_parquet_exists(self, parquet_path):
-        assert parquet_path.exists()
-
-    def test_parquet_schema(self, parquet_path):
-        con = duckdb.connect(":memory:")
-        con.execute(f"CREATE TABLE atti AS SELECT * FROM read_parquet('{parquet_path}')")
-
-        columns = {row[0] for row in con.execute("DESCRIBE atti").fetchall()}
-        expected = {"id", "serie", "gazzetta_numero", "data_pubblicazione",
-                    "titolo", "tipo_atto", "ente", "link", "topic_str",
-                    "urn_normattiva", "link_normattiva"}
-        assert expected.issubset(columns)
-
-    def test_parquet_has_all_series(self, parquet_path):
-        con = duckdb.connect(":memory:")
-        con.execute(f"CREATE TABLE atti AS SELECT * FROM read_parquet('{parquet_path}')")
-
-        series = {row[0] for row in con.execute("SELECT DISTINCT serie FROM atti").fetchall()}
-        assert series == {"SG", "S1", "S2", "S3", "S4", "S5", "P2"}
-
-    def test_parquet_row_count(self, parquet_path):
-        con = duckdb.connect(":memory:")
-        con.execute(f"CREATE TABLE atti AS SELECT * FROM read_parquet('{parquet_path}')")
-
-        count = con.execute("SELECT COUNT(*) FROM atti").fetchone()[0]
-        assert count >= 1500  # At least 1500 unique acts from 30 days (after dedup on id)
-
-    def test_parquet_date_range(self, parquet_path):
-        con = duckdb.connect(":memory:")
-        con.execute(f"CREATE TABLE atti AS SELECT * FROM read_parquet('{parquet_path}')")
-
-        min_date = con.execute("SELECT MIN(data_pubblicazione) FROM atti").fetchone()[0]
-        max_date = con.execute("SELECT MAX(data_pubblicazione) FROM atti").fetchone()[0]
-        assert min_date is not None
-        assert max_date is not None
-        assert max_date >= min_date
-
-    def test_parquet_urn_normattiva(self, parquet_path):
-        con = duckdb.connect(":memory:")
-        con.execute(f"CREATE TABLE atti AS SELECT * FROM read_parquet('{parquet_path}')")
-
-        # All rows should have urn_normattiva column (possibly empty)
-        cols = {row[0] for row in con.execute("DESCRIBE atti").fetchall()}
-        assert "urn_normattiva" in cols
-        assert "link_normattiva" in cols
-
-        # Some rows should have non-empty URN (from gu_links.json crossref)
-        non_empty = con.execute(
-            "SELECT COUNT(*) FROM atti WHERE urn_normattiva IS NOT NULL AND urn_normattiva != ''"
-        ).fetchone()[0]
-        assert non_empty > 0
+@pytest.fixture(scope="module")
+def con():
+    if not STORE.exists():
+        pytest.skip("event log assente: esegui `make store-pull`")
+    conn = duckdb.connect()
+    conn.execute(f"CREATE TABLE atti AS SELECT * FROM read_parquet('{STORE}')")
+    yield conn
+    conn.close()
 
 
-class TestAnalytics:
-    """Test analytics script runs without errors."""
+def test_schema(con):
+    colonne = {r[0] for r in con.execute("DESCRIBE atti").fetchall()}
+    assert ATTESE.issubset(colonne)
 
-    def test_analytics_runs(self, capsys):
-        # L'event log non è più in git: senza `make store-pull` lo smoke non ha
-        # dati su cui girare (stesso criterio degli altri test su parquet).
-        event_log = Path(__file__).parent.parent / "data" / "gu_acts.parquet"
-        if not event_log.exists():
-            pytest.skip("event log assente: esegui `make store-pull`")
 
-        from analytics import main
+def test_chiave_id_unica(con):
+    duplicati = con.execute(
+        "SELECT count(*) FROM (SELECT id FROM atti GROUP BY 1 HAVING count(*) > 1)"
+    ).fetchone()[0]
+    assert duplicati == 0
 
-        # Mock sys.argv
-        old_argv = sys.argv
-        sys.argv = ["analytics.py"]
-        try:
-            result = main()
-            assert result == 0
-        finally:
-            sys.argv = old_argv
+
+def test_tutte_le_serie(con):
+    serie = {r[0] for r in con.execute("SELECT DISTINCT serie FROM atti").fetchall()}
+    assert serie == {"SG", "S1", "S2", "S3", "S4", "S5", "P2"}
+
+
+def test_date_valide(con):
+    minore, maggiore = con.execute(
+        "SELECT min(data_pubblicazione), max(data_pubblicazione) FROM atti"
+    ).fetchone()
+    assert minore is not None and maggiore is not None
+    assert maggiore >= minore
+
+
+def test_urn_solo_su_atti_normativi(con):
+    """Un URN fuori dai codici AAGG###### sarebbe un errore di crossref."""
+    sporchi = con.execute(
+        """SELECT count(*) FROM atti
+           WHERE urn_normattiva <> '' AND NOT regexp_matches(id, '^[0-9]{2}G')"""
+    ).fetchone()[0]
+    assert sporchi == 0

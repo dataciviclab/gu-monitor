@@ -16,10 +16,6 @@ on:
       anni:
         description: "Anni: singolo (2025) o intervallo (2019-2025)"
         required: true
-      serie:
-        description: "Serie separate da spazio (default: tutte)"
-        required: false
-        default: ""
       sleep:
         description: "Pausa fra richieste in secondi (cortesia verso la fonte)"
         required: false
@@ -60,23 +56,10 @@ jobs:
       - name: Ricostruisci gli anni richiesti
         env:
           ANNI: ${{ inputs.anni }}
-          SERIE: ${{ inputs.serie }}
           SLEEP: ${{ inputs.sleep }}
         run: |
           set -euo pipefail
-          ARGS=(--anni "$ANNI" --sleep "$SLEEP")
-          # shellcheck disable=SC2086
-          [ -n "$SERIE" ] && ARGS+=(--serie $SERIE)
-          python scripts/rebuild_archivio.py "${ARGS[@]}"
-
-      - name: Unisci gli anni all'event log
-        run: |
-          set -euo pipefail
-          shopt -s nullglob
-          for f in data/gu_atti_rebuild_*.json; do
-            echo "=== $f"
-            python scripts/to_parquet.py --rebuild --input "$f"
-          done
+          python scripts/collect.py --anni "$ANNI" --sleep "$SLEEP"
 
       - name: Verifica copertura per anno
         run: |
