@@ -131,3 +131,24 @@ class TestUrn:
         con.close()
         assert urn == "urn:nir:stato:legge:2026-07-16;129"
         assert link.startswith("https://www.normattiva.it/uri-res/N2Ls?urn:nir:")
+
+
+def test_rebuild_non_perde_gli_urn(tmp_path):
+    """Il rebuild riparte dal parser, che non conosce gli URN: quelli già
+    risolti vanno conservati, altrimenti ogni rebuild li rifà tutti (e se
+    una chiamata fallisce il dato peggiora)."""
+    urn = "urn:nir:stato:decreto.legge:2026-07-23;127"
+    store = _store(tmp_path, [dict(RIGA, urn_normattiva=urn)])
+
+    con = duckdb.connect()
+    nuovo = dict(RIGA)
+    nuovo["urn_normattiva"] = None
+    nuovo["titolo"] = "titolo ricostruito"
+    merge(con, store, [nuovo], rebuild=True)
+
+    urn_dopo = con.execute("SELECT urn_normattiva FROM merged").fetchone()[0]
+    titolo = con.execute("SELECT titolo FROM merged").fetchone()[0]
+    con.close()
+
+    assert titolo == "titolo ricostruito"   # il rebuild vince sul contenuto
+    assert urn_dopo == urn                  # ma non cancella l'URN

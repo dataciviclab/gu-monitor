@@ -28,7 +28,7 @@ I contatori (atti, enti, picchi) non sono hardcoded: cambiano a ogni run e si le
 
 ## Dashboard
 
-Streamlit, deployata su Streamlit Cloud (entry point: `dashboard/app.py`).
+Streamlit, deployata su Streamlit Cloud. La dashboard vive in `dashboard/`; l'`app.py` alla root è un redirect di 3 righe per il deploy esistente (main file path non modificabile dalla UI).
 
 | Pagina | Cosa mostra |
 |---|---|
@@ -54,6 +54,11 @@ Il cuore è l'**event log**: un singolo Parquet con tutti gli atti unici, tenuto
 `gs://dataciviclab-clean/gu-monitor/_event_log/` (non in git). In locale lo scarichi
 con `make store-pull`. Chiave: `id` (codice redazionale). Il dataset pubblicato è
 invece `gs://dataciviclab-clean/gu-monitor/gu_atti/<anno>/`.
+
+Lo store tiene anche due campi grezzi della pagina (`rubrica_raw`, `emittitore_raw`)
+che **non** entrano nel clean: servono a correggere `sezione`/`ente` con un `UPDATE`
+invece di ri-scaricare 755 pubblicazioni. Sono NULL sulle righe catturate prima
+del rebuild che li ha introdotti.
 
 | Colonna | Tipo | Descrizione |
 |---|---|---|

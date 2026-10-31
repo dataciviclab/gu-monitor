@@ -1,0 +1,4 @@
+# Streamlit Cloud cerca le dipendenze nella cartella dell'entry point (root,
+# per lo shim `app.py`) e qui trova questo file prima di pyproject.toml.
+# Le dipendenze vere stanno in dashboard/requirements.txt.
+-r dashboard/requirements.txt
