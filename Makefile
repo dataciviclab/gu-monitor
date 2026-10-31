@@ -34,9 +34,9 @@ run:
 .PHONY: run-all
 run-all: run
 
-# Cattura + pipeline: quello che gira ogni notte in CI.
+# Giro completo in locale. NON pubblica su GCS: lo store lo scrive solo la CI.
 .PHONY: daily
-daily: store-pull ingest store-push run
+daily: store-pull ingest run
 
 .PHONY: check
 check:

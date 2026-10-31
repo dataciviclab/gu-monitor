@@ -192,8 +192,9 @@ def atti_da_html(html: str, serie: str, numero: str, data: str) -> list[dict]:
         oggetto = _pulisci_testo(_testo(anchors[-1])) if anchors else ""
 
         ente = _testo(blocco.find_previous("span", class_="emettitore"))
-        if not ente:
-            # S1 (Corte Costituzionale) non ha emettitore: la sezione fa da ente.
+        if not ente and serie == "S1":
+            # La Corte Costituzionale non ha emettitore: la sezione fa da ente.
+            # Sulle altre serie un'entita' mancante resta None (non inventiamo).
             ente = _testo(blocco.find_previous("span", class_="rubrica"))
         if not ente and serie == "S2":
             ente = "UNIONE EUROPEA"

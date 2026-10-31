@@ -39,7 +39,9 @@ from gu_source import (  # noqa: E402
     url_dettaglio,
 )
 
-MAX_RICHIESTE = 5000  # guardia: un bug non deve diventare un blocco IP
+# Guardia anti-runaway: ~900 pubblicazioni/anno + margine. Non è un limite di
+# prodotto, è la rete che impedisce a un bug di diventare un blocco IP.
+MAX_RICHIESTE_PER_ANNO = 1200
 NORMATTIVA_LINK = "https://www.normattiva.it/uri-res/N2Ls?"
 NORMATTIVA_API = "https://api.normattiva.it/t/normattiva.api/bff-opendata/v1/api/v1"
 
@@ -333,6 +335,8 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--overlap", type=int, default=3, help="giorni di sovrapposizione")
     ap.add_argument("--lookback-days", type=int, default=30, help="finestra se lo store è vuoto")
     ap.add_argument("--sleep", type=float, default=0.5)
+    ap.add_argument("--max-richieste", type=int, default=None,
+                    help="default: 1200 per anno attraversato")
     ap.add_argument("--store", default=None, help="default data/gu_acts.parquet")
     ap.add_argument("--dry-run", action="store_true")
     args = ap.parse_args(argv)
@@ -355,6 +359,7 @@ def main(argv: list[str] | None = None) -> int:
         rebuild = False
         print(f"[incrementale] watermark {wm or 'nessuno'} · finestra dal {inizio}")
 
+    max_richieste = args.max_richieste or (MAX_RICHIESTE_PER_ANNO * len(anni) + 100)
     righe: list[dict] = []
     attese = scaricate = 0
     fallite: list[tuple[str, str, str]] = []
@@ -383,8 +388,8 @@ def main(argv: list[str] | None = None) -> int:
             continue
 
         for i, pub in enumerate(da_fare, 1):
-            if richieste >= MAX_RICHIESTE:
-                fallite.append((serie, pub["numero"], "guardia richieste"))
+            if richieste >= max_richieste:
+                fallite.append((serie, pub["numero"], f"guardia richieste ({max_richieste})"))
                 break
             try:
                 righe += atti_da_html(

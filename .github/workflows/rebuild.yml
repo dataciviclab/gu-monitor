@@ -29,7 +29,7 @@ jobs:
   rebuild:
     runs-on: ubuntu-latest
     # Un anno ≈ 40 minuti: il tetto tiene margine per un intervallo ampio.
-    timeout-minutes: 330
+    timeout-minutes: 360
     permissions:
       contents: read
       id-token: write

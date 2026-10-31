@@ -154,7 +154,7 @@ Comandi locali:
 make store-pull   # scarica event log + cache URN da GCS
 make ingest       # cattura (rete) e aggiorna l'event log
 make run          # build raw -> clean -> mart
-make daily        # pull + ingest + push + build
+make daily        # pull + ingest + build (non pubblica: il push lo fa la CI)
 make check        # config toolkit
 make rebuild ANNO=2026
 ```
