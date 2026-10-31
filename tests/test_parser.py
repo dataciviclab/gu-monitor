@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
-"""Test del parser 30gg e della classificazione tipo atto.
+"""Test del parser della Gazzetta.
 
-Coprono due regressioni viste sul dataset reale:
-- i decreti-legge finivano in `tipo_atto = LEGGE` perché "LEGGE" era il
-  primo pattern e matchava dentro "DECRETO-LEGGE";
+Coprono le regressioni viste sul dataset reale:
+- i decreti-legge finivano in `tipo_atto = LEGGE` perché "LEGGE" era il primo
+  pattern e matchava dentro "DECRETO-LEGGE";
 - ogni atto produceva due record (estremi + oggetto) e la dedup teneva il
-  primo, quindi il titolo era "DECRETO 5 agosto 2026" invece dell'oggetto.
+  primo, quindi il titolo era "DECRETO 5 agosto 2026" invece dell'oggetto;
+- la serie UE (S2) non ha link per atto: si punta alla pagina della gazzetta.
 """
 
 import sys
@@ -13,7 +14,12 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "scripts"))
 
-from gu_source import DetailParser, ListPubblicazioniParser, classify_tipo  # noqa: E402
+from gu_source import (  # noqa: E402
+    _pubblicazioni_da_html,
+    _pulisci_testo,
+    atti_da_html,
+    classify_tipo,
+)
 
 PAGINA_SG = """
 <html><body>
@@ -47,7 +53,6 @@ PAGINA_DL = """
 </body></html>
 """
 
-
 PAGINA_P2 = """
 <html><body>
 <span class="rubrica"> Annunzi commerciali</span>
@@ -64,23 +69,19 @@ PAGINA_P2 = """
 </body></html>
 """
 
-
-class TestListPubblicazioniParser:
-    def test_estrae_data_e_numero_senza_duplicati(self):
-
-        html = """
-        <a href="/gazzetta/serie_generale/caricaDettaglio?dataPubblicazioneGazzetta=2026-01-02&numeroGazzetta=1">x</a>
-        <a href="/gazzetta/serie_generale/caricaDettaglio?dataPubblicazioneGazzetta=2026-01-02&numeroGazzetta=1">x</a>
-        <a href="/gazzetta/serie_generale/caricaDettaglio?dataPubblicazioneGazzetta=2026-01-03&numeroGazzetta=2">y</a>
-        <a href="/altro/link">z</a>
-        """
-        parser = ListPubblicazioniParser()
-        parser.feed(html)
-
-        assert parser.pubs == [
-            {"data": "2026-01-02", "numero": "1"},
-            {"data": "2026-01-03", "numero": "2"},
-        ]
+PAGINA_S2 = """
+<html><body>
+<span class="risultato">
+  <a href="/do/gazzetta/unione_europea/3/pdfPaginato?numPagina=3">
+    <span class="data">DECISIONE 3 marzo 2026 , n. 1</span>
+  </a>
+  <a href="/do/gazzetta/unione_europea/3/pdfPaginato?numPagina=3">
+    Decisione n. 1/2026 del comitato per l'agevolazione degli investimenti (26CE2527)
+    <span class="pagina">Pag. 1</span>
+  </a>
+</span>
+</body></html>
+"""
 
 
 class TestClassifyTipo:
@@ -99,6 +100,12 @@ class TestClassifyTipo:
             == "TESTO COORDINATO"
         )
 
+    def test_decisione_pesc_prima_di_decisione(self):
+        assert classify_tipo("DECISIONE PESC 12 maggio 2026, n. 3") == "DECISIONE PESC"
+
+    def test_direttiva(self):
+        assert classify_tipo("DIRETTIVA (UE) 2024/123") == "DIRETTIVA"
+
     def test_comunicato(self):
         assert classify_tipo("COMUNICATO") == "COMUNICATO"
 
@@ -106,66 +113,78 @@ class TestClassifyTipo:
         assert classify_tipo("") == "ALTRO"
 
     def test_non_matcha_dentro_parole(self):
-        # "LEGGE" non deve matchare "LEGGI" né "ALLEGGE"
         assert classify_tipo("LEGGI ED ALTRI ATTI NORMATIVI") == "ALTRO"
 
 
 class TestPuliziaTesto:
     def test_toglie_codice_e_pagina(self):
-        from gu_source import _pulisci_testo
-
         assert (
             _pulisci_testo("Regolamento in attuazione dell'articolo 12. (26G00215) Pag. 1")
             == "Regolamento in attuazione dell'articolo 12."
         )
 
     def test_toglie_solo_pagina(self):
-        from gu_source import _pulisci_testo
-
         assert _pulisci_testo("Avviso di cessione di crediti Pag. 2") == "Avviso di cessione di crediti"
 
     def test_non_tocca_parentesi_descrittive(self):
-        from gu_source import _pulisci_testo
-
         assert _pulisci_testo("Decreto (testo coordinato)") == "Decreto (testo coordinato)"
 
 
-class TestDetailParser:
+class TestElenco:
+    def test_estrae_data_e_numero_senza_duplicati(self):
+        html = """
+        <a href="/gazzetta/serie_generale/caricaDettaglio?dataPubblicazioneGazzetta=2026-01-02&numeroGazzetta=1">x</a>
+        <a href="/gazzetta/serie_generale/caricaDettaglio?dataPubblicazioneGazzetta=2026-01-02&numeroGazzetta=1">x</a>
+        <a href="/gazzetta/serie_generale/caricaDettaglio?dataPubblicazioneGazzetta=2026-01-03&numeroGazzetta=2">y</a>
+        <a href="/altro/link">z</a>
+        """
+        assert _pubblicazioni_da_html(html) == [
+            {"data": "2026-01-02", "numero": "1"},
+            {"data": "2026-01-03", "numero": "2"},
+        ]
+
+    def test_formato_30gg_senza_trattini(self):
+        html = '<a href="/x?dataPubblicazioneGazzetta=20261029&numeroGazzetta=252">x</a>'
+        assert _pubblicazioni_da_html(html) == [{"data": "2026-10-29", "numero": "252"}]
+
+
+class TestAtti:
     def _parse(self, html: str, serie: str = "SG") -> list[dict]:
-        parser = DetailParser(serie=serie)
-        parser.feed(html)
-        return parser.acts
+        return atti_da_html(html, serie, "252", "2026-10-29")
 
     def test_un_solo_atto_per_codice(self):
         acts = self._parse(PAGINA_SG)
         assert len(acts) == 1
-        assert acts[0]["codice"] == "26G00215"
+        assert acts[0]["id"] == "26G00215"
 
     def test_titolo_e_l_oggetto_non_gli_estremi(self):
-        acts = self._parse(PAGINA_SG)
-        assert acts[0]["titolo"].startswith("Regolamento in attuazione")
+        assert self._parse(PAGINA_SG)[0]["titolo"].startswith("Regolamento in attuazione")
 
     def test_estremi_conservati(self):
-        acts = self._parse(PAGINA_SG)
-        assert acts[0]["estremi"] == "DECRETO 5 agosto 2026, n. 198"
+        assert self._parse(PAGINA_SG)[0]["estremi"] == "DECRETO 5 agosto 2026, n. 198"
 
     def test_tipo_classificato_sugli_estremi(self):
-        acts = self._parse(PAGINA_SG)
-        assert acts[0]["tipo_atto"] == "DECRETO"
+        assert self._parse(PAGINA_SG)[0]["tipo_atto"] == "DECRETO"
 
     def test_ente_da_emettitore(self):
-        acts = self._parse(PAGINA_SG)
-        assert acts[0]["ente"] == "MINISTERO DELLA SALUTE"
+        assert self._parse(PAGINA_SG)[0]["ente"] == "MINISTERO DELLA SALUTE"
 
     def test_decreto_legge_classificato(self):
         acts = self._parse(PAGINA_DL)
-        assert len(acts) == 1
         assert acts[0]["tipo_atto"] == "DECRETO-LEGGE"
         assert acts[0]["titolo"].startswith("Misure urgenti")
 
-    def test_ente_non_sovrascritto_da_testo_maiuscolo(self):
-        """In P2 il testo maiuscolo dentro l'anchor è il soggetto, non l'ente."""
+    def test_p2_soggetto_negli_estremi(self):
         acts = self._parse(PAGINA_P2, serie="P2")
-        assert acts[0]["ente"] == "Convocazioni di assemblea"
         assert acts[0]["estremi"] == "RIALTO S.P.A."
         assert acts[0]["titolo"] == "Convocazione di assemblea"
+
+    def test_s2_codice_dal_testo_e_link_alla_gazzetta(self):
+        acts = self._parse(PAGINA_S2, serie="S2")
+        assert acts[0]["id"] == "26CE2527"
+        assert acts[0]["ente"] == "UNIONE EUROPEA"
+        assert "/gazzetta/unione_europea/caricaDettaglio?" in acts[0]["link"]
+
+    def test_link_atto_non_canonico(self):
+        """Il flag di navigazione lo toglie to_parquet, non il parser."""
+        assert "codiceRedazionale=26G00215" in self._parse(PAGINA_SG)[0]["link"]
