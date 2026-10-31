@@ -4,7 +4,7 @@
 
 La Gazzetta Ufficiale è il diario ufficiale dello Stato italiano. Ogni legge, ogni decreto, ogni bando di concorso passa da qui. Ma nessuno la monitora sistematicamente.
 
-Questo progetto lo fa: **25.711 atti unici**, 7 serie, 648 enti, 21 tipi di atto, 16 topic, tutto interrogabile.
+Questo progetto lo fa: le **7 serie** della Gazzetta, un record per atto. La colonna `codice_genere` separa i **218 atti normativi** (codici `AAGG######`, gli unici che Normattiva indicizza) dal resto — avvisi, concorsi, sentenze, notifiche.
 
 [![CI](https://github.com/dataciviclab/gu-monitor/actions/workflows/ci.yml/badge.svg)](https://github.com/dataciviclab/gu-monitor/actions/workflows/ci.yml)
 [![Daily Update](https://github.com/dataciviclab/gu-monitor/actions/workflows/daily-update.yml/badge.svg)](https://github.com/dataciviclab/gu-monitor/actions/workflows/daily-update.yml)
@@ -12,36 +12,39 @@ Questo progetto lo fa: **25.711 atti unici**, 7 serie, 648 enti, 21 tipi di atto
 
 ---
 
-## Dashboard
-
-La dashboard Streamlit mostra in tempo reale cosa pubblica lo Stato italiano.
-
-```bash
-# Avvio locale
-pip install -r requirements.txt
-streamlit run app.py
-```
-
-Oppure con Docker:
-
-```bash
-docker build -t gu-monitor .
-docker run -p 8501:8501 gu-monitor
-```
-
 ---
 
 ## Numeri chiave
 
 | Metrica | Valore |
 |---|---|
-| Atti totali | **25.711** |
 | Serie monitorate | **7** |
-| Enti rilevati | **648** |
-| Tipi di atto | **21** |
-| Topic classificati | **16** |
-| Copertura topic | **79%** |
-| Peak day | **275 atti (28 aprile 2026)** |
+| Granularità | 1 record per atto |
+| Aggiornamento | giornaliero (watermark) |
+
+I contatori (atti, enti, picchi) non sono hardcoded: cambiano a ogni run e si leggono dal dataset.
+
+---
+
+## Dashboard
+
+Streamlit, deployata su Streamlit Cloud (entry point: `dashboard/app.py`).
+
+| Pagina | Cosa mostra |
+|---|---|
+| Panoramica | atti per serie, normativi vs resto, enti che pubblicano di più |
+| Atti normativi | i 218 atti/anno con estremi, ente e link Normattiva |
+| Sezioni | le rubriche della Gazzetta |
+| Query SQL | SQL libero sul clean |
+
+I dati arrivano dal **clean pubblicato su GCS** via `lab-connectors`: nessun file
+locale, nessun URL hardcoded.
+
+```bash
+cd dashboard
+pip install -r requirements.txt
+streamlit run app.py
+```
 
 ---
 
@@ -60,10 +63,11 @@ invece `gs://dataciviclab-clean/gu-monitor/gu_atti/<anno>/`.
 | `data_pubblicazione` | DATE | Data di pubblicazione |
 | `titolo` | VARCHAR | Oggetto dell'atto (dal secondo anchor della pagina GU) |
 | `estremi` | VARCHAR | Estremi come pubblicati (`DECRETO 5 agosto 2026, n. 198`) |
-| `tipo_atto` | VARCHAR | LEGGE / DECRETO-LEGGE / CONCORSO / etc (21 tipi) |
-| `ente` | VARCHAR | Ente emittente (`span.emettitore`) |
+| `tipo_atto` | VARCHAR | Genere dell'atto (LEGGE, DECRETO-LEGGE, DECRETO LEGISLATIVO, CONCORSO…); tassonomia in `scripts/gu_source.py` |
+| `ente` | VARCHAR | Ente emittente. NULL su P2/S5 (lì il campo della fonte è una rubrica) |
 | `link` | VARCHAR | URL della pagina di dettaglio GU |
-| `topic_str` | VARCHAR | Topic classificati (16 topic) |
+| `sezione` | VARCHAR | Rubrica della pagina (`Eredita'`, `Convocazioni di assemblea`) |
+| `codice_genere` | VARCHAR | `G` = codice `AAGG######` (indicizzato da Normattiva), `A` = tutto il resto |
 | `urn_normattiva` | VARCHAR | URN NIR per gli atti normativi (crossref API Normattiva) |
 
 ---
@@ -87,11 +91,11 @@ FROM 'data/gu_acts.parquet'
 WHERE tipo_atto = 'DECRETO' AND ente IS NOT NULL
 GROUP BY ente ORDER BY n DESC;
 
--- Atti per topic
-SELECT UNNEST(string_split(topic_str, ',')) AS topic, COUNT(*) AS n
+-- Atti normativi (gli unici che Normattiva indicizza)
+SELECT tipo_atto, COUNT(*) AS n
 FROM 'data/gu_acts.parquet'
-WHERE topic_str != ''
-GROUP BY topic ORDER BY n DESC;
+WHERE codice_genere = 'G'
+GROUP BY tipo_atto ORDER BY n DESC;
 
 -- Media atti per gazzetta
 SELECT serie,
@@ -105,7 +109,7 @@ GROUP BY serie ORDER BY media DESC;
 ### Via script
 
 ```bash
-pip install -r requirements.txt
+pip install -e .
 
 # Cattura incrementale + URN + merge nello store
 python scripts/collect.py
@@ -151,12 +155,12 @@ lo store su GCS lo scrive solo la pipeline). Dopo il backfill va aggiornato
 Comandi locali:
 
 ```bash
-make store-pull   # scarica event log + cache URN da GCS
+make store-pull   # scarica l'event log da GCS
 make ingest       # cattura (rete) e aggiorna l'event log
 make run          # build raw -> clean -> mart
 make daily        # pull + ingest + build (non pubblica: il push lo fa la CI)
 make check        # config toolkit
-make rebuild ANNO=2026
+make rebuild ANNI=2026
 ```
 
 ---
@@ -165,13 +169,16 @@ make rebuild ANNO=2026
 
 ```
 gu-monitor/
+├── dashboard/
+│   ├── app.py                # entry point Streamlit
+│   ├── sources.py            # data layer (clean su GCS)
+│   ├── pages/                # Panoramica, Normativi, Sezioni, SQL
+│   └── requirements.txt      # letto da Streamlit Cloud
 ├── .github/workflows/
 │   ├── ci.yml                # lint + test + config check
 │   ├── daily-update.yml      # cattura + build (GCS → clean/mart)
 │   ├── pipeline.yml          # rebuild manuale / su modifica pipeline
 │   └── rebuild.yml           # backfill storico (CI only)
-├── .streamlit/
-│   └── config.toml           # Tema dashboard
 ├── datasets/gu-atti/
 │   ├── dataset.yml           # contratto toolkit
 │   └── sql/                  # clean + 3 mart
@@ -180,13 +187,10 @@ gu-monitor/
 │   ├── collect.py            # Store: incrementale e backfill + URN
 │   └── verify_clean.py       # Guardia del build
 ├── tests/
-│   └── test_*.py             # 44 test
+│   └── test_*.py             # contratto store, parser, merge
 ├── data/
-│   └── (event log e cache URN: scaricati da GCS, mai in git)
+│   └── (event log scaricato da GCS, mai in git)
 ├── Makefile                  # ingest / run / daily / check / rebuild
-├── app.py                    # Dashboard Streamlit
-├── Dockerfile                # Container deploy
-├── requirements.txt          # Dipendenze
 ├── pyproject.toml            # Project config
 ├── schema.md                 # Documentazione schema
 └── README.md

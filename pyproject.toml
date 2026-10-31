@@ -21,12 +21,13 @@ dependencies = [
 packages = []
 
 [project.optional-dependencies]
+# Sorgente per dashboard/requirements.txt (Streamlit Cloud legge solo quello).
+dashboard = [
+    "streamlit>=1.61",
+    "plotly>=5.18",
+]
 pipeline = [
     "dataciviclab-toolkit @ git+https://github.com/dataciviclab/toolkit.git",
-]
-dashboard = [
-    "streamlit>=1.35.0",
-    "plotly>=5.18.0",
 ]
 dev = [
     "pytest>=7.0.0",
@@ -34,7 +35,8 @@ dev = [
 ]
 
 [tool.pytest.ini_options]
-testpaths = ["tests"]
+testpaths = ["tests", "dashboard/tests"]
+markers = ["smoke: test veloci di fumo sulla dashboard"]
 
 [tool.ruff]
 line-length = 100

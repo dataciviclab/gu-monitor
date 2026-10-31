@@ -26,7 +26,7 @@ def _riga(**override):
         "estremi": "DECRETO-LEGGE 23 luglio 2026, n. 127",
         "tipo_atto": "DECRETO-LEGGE",
         "ente": "PRESIDENZA DEL CONSIGLIO DEI MINISTRI",
-        "topic_str": "",
+        "sezione": "LEGGI ED ALTRI ATTI NORMATIVI",
         "link": "L1",
         "urn_normattiva": None,
         "link_normattiva": None,

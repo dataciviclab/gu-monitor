@@ -96,9 +96,7 @@ class TestEnrich:
                   "link": "", "data_pubblicazione": "2026-10-29", "tipo_atto": "ALTRO"}]
         assert enrich(righe)[0]["tipo_atto"] == "CONCORSO"
 
-    def test_topic_e_data_normalizzata(self):
+    def test_data_normalizzata(self):
         righe = [{"id": "1", "titolo": "Imposta sul reddito", "link": "",
                   "data_pubblicazione": "29-10-2026", "tipo_atto": "LEGGE"}]
-        out = enrich(righe)[0]
-        assert out["topic_str"] == "fisco"
-        assert out["data_pubblicazione"] == "2026-10-29"
+        assert enrich(righe)[0]["data_pubblicazione"] == "2026-10-29"

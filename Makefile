@@ -20,6 +20,13 @@ store-pull:
 store-push:
 	@gcloud storage cp data/gu_acts.parquet $(GCS_STORE)/gu_acts.parquet --quiet
 
+# Copia di sicurezza dell'ultimo store buono, prima di sovrascriverlo.
+# Ripristino: gcloud storage cp $(GCS_STORE)/gu_acts_prev.parquet $(GCS_STORE)/gu_acts.parquet
+.PHONY: store-backup
+store-backup:
+	@gcloud storage cp $(GCS_STORE)/gu_acts.parquet $(GCS_STORE)/gu_acts_prev.parquet --quiet \
+		&& echo "backup: gu_acts_prev.parquet" || echo "backup: store assente"
+
 .PHONY: ingest
 ingest:
 	@python scripts/collect.py
