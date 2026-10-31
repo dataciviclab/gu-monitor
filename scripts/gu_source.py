@@ -35,6 +35,9 @@ SERIE = tuple(SERIE_SLUGS)
 # è un cambio di schema. L'ordine è per specificità decrescente.
 TIPI_ATTO = (
     "TESTO COORDINATO",
+    "DECRETO DEL PRESIDENTE DELLA REPUBBLICA",
+    "DECRETO DEL PRESIDENTE DEL CONSIGLIO",
+    "DECRETO LEGISLATIVO",
     "DECRETO-LEGGE",
     "DECISIONE PESC",
     "DECISIONE",
@@ -191,13 +194,22 @@ def atti_da_html(html: str, serie: str, numero: str, data: str) -> list[dict]:
         # Il primo anchor porta gli estremi, l'ultimo l'oggetto.
         oggetto = _pulisci_testo(_testo(anchors[-1])) if anchors else ""
 
-        ente = _testo(blocco.find_previous("span", class_="emettitore"))
-        if not ente and serie == "S1":
-            # La Corte Costituzionale non ha emettitore: la sezione fa da ente.
-            # Sulle altre serie un'entita' mancante resta None (non inventiamo).
-            ente = _testo(blocco.find_previous("span", class_="rubrica"))
-        if not ente and serie == "S2":
-            ente = "UNIONE EUROPEA"
+        # `sezione` è la rubrica della pagina (Annunzi commerciali, Sentenze…):
+        # un titolo di sezione, NON un ente. `ente` resta valorizzato solo dove
+        # il campo della fonte è davvero l'emittente.
+        rubrica = _testo(blocco.find_previous("span", class_="rubrica"))
+        emettitore = _testo(blocco.find_previous("span", class_="emettitore"))
+        if serie in ("P2", "S5"):
+            # Qui `emettitore` è la rubrica di secondo livello ("Eredita'",
+            # "Aste immobiliari"): è una sezione, non chi pubblica.
+            ente, sezione = None, emettitore or rubrica
+        elif serie == "S1":
+            # La Corte non ha emettitore nel markup: l'emittente è noto.
+            ente, sezione = "CORTE COSTITUZIONALE", rubrica
+        elif serie == "S2":
+            ente, sezione = "UNIONE EUROPEA", rubrica
+        else:
+            ente, sezione = emettitore or None, rubrica
 
         href = anchors[0]["href"] if anchors else ""
         link = (
@@ -215,6 +227,7 @@ def atti_da_html(html: str, serie: str, numero: str, data: str) -> list[dict]:
             "estremi": estremi,
             "tipo_atto": classify_tipo(estremi),
             "ente": ente or None,
+            "sezione": sezione or None,
             "link": link,
         })
 

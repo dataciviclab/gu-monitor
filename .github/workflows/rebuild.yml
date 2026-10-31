@@ -53,6 +53,9 @@ jobs:
       - name: Scarica l'event log
         run: make store-pull
 
+      - name: Backup dello store corrente
+        run: make store-backup
+
       - name: Ricostruisci gli anni richiesti
         env:
           ANNI: ${{ inputs.anni }}
@@ -64,15 +67,23 @@ jobs:
       - name: Verifica copertura per anno
         run: |
           python - <<'PY'
+          import sys
           import duckdb
+
           con = duckdb.connect()
-          print(con.execute("""
+          righe = con.execute("""
               SELECT substr(CAST(data_pubblicazione AS VARCHAR), 1, 4) AS anno,
                      count(*) AS atti,
                      count(*) FILTER (WHERE urn_normattiva <> '') AS con_urn
               FROM read_parquet('data/gu_acts.parquet')
               GROUP BY 1 ORDER BY 1
-          """).fetchall())
+          """).fetchall()
+          for anno, atti, urn in righe:
+              print(f"{anno}: {atti} atti · {urn} URN")
+          # Un anno a zero atti, o senza nessun URN, e' un backfill fallito:
+          # meglio rosso qui che un anno vuoto pubblicato.
+          if not righe or any(atti == 0 or urn == 0 for _, atti, urn in righe):
+              sys.exit("copertura incompleta: vedi i conteggi sopra")
           PY
 
       - name: Ricarica l'event log

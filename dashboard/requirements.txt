@@ -1,0 +1,7 @@
+# Generato da pyproject.toml [project.optional-dependencies] dashboard.
+# Streamlit Community Cloud legge solo requirements.txt.
+streamlit>=1.61
+duckdb>=1.5
+plotly>=5.18
+pandas>=2.0
+dataciviclab-toolkit @ git+https://github.com/dataciviclab/toolkit.git

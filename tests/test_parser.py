@@ -100,6 +100,21 @@ class TestClassifyTipo:
             == "TESTO COORDINATO"
         )
 
+    def test_decreto_legislativo_non_e_decreto(self):
+        assert classify_tipo("DECRETO LEGISLATIVO 28 settembre 2026, n. 197") == "DECRETO LEGISLATIVO"
+
+    def test_dpr_non_e_decreto(self):
+        assert (
+            classify_tipo("DECRETO DEL PRESIDENTE DELLA REPUBBLICA 12 marzo 2026, n. 40")
+            == "DECRETO DEL PRESIDENTE DELLA REPUBBLICA"
+        )
+
+    def test_dpcm_non_e_decreto(self):
+        assert (
+            classify_tipo("DECRETO DEL PRESIDENTE DEL CONSIGLIO DEI MINISTRI 3 aprile 2026")
+            == "DECRETO DEL PRESIDENTE DEL CONSIGLIO"
+        )
+
     def test_decisione_pesc_prima_di_decisione(self):
         assert classify_tipo("DECISIONE PESC 12 maggio 2026, n. 3") == "DECISIONE PESC"
 
@@ -169,6 +184,9 @@ class TestAtti:
     def test_ente_da_emettitore(self):
         assert self._parse(PAGINA_SG)[0]["ente"] == "MINISTERO DELLA SALUTE"
 
+    def test_sezione_e_la_rubrica(self):
+        assert self._parse(PAGINA_SG)[0]["sezione"] == "LEGGI ED ALTRI ATTI NORMATIVI"
+
     def test_decreto_legge_classificato(self):
         acts = self._parse(PAGINA_DL)
         assert acts[0]["tipo_atto"] == "DECRETO-LEGGE"
@@ -179,6 +197,23 @@ class TestAtti:
         assert acts[0]["estremi"] == "RIALTO S.P.A."
         assert acts[0]["titolo"] == "Convocazione di assemblea"
 
+    def test_p2_ente_nullo_e_sezione_valorizzata(self):
+        """In P2 il campo `emettitore` è una rubrica, non chi pubblica."""
+        acts = self._parse(PAGINA_P2, serie="P2")
+        assert acts[0]["ente"] is None
+        assert acts[0]["sezione"] == "Convocazioni di assemblea"
+
+    def test_s1_ente_costante(self):
+        html = PAGINA_S1
+        acts = atti_da_html(html, "S1", "43", "2026-10-28")
+        assert acts[0]["ente"] == "CORTE COSTITUZIONALE"
+
+    def test_s5_ente_nullo(self):
+        html = PAGINA_S5
+        acts = atti_da_html(html, "S5", "123", "2026-10-28")
+        assert acts[0]["ente"] is None
+        assert acts[0]["sezione"] == "ASTE IMMOBILIARI ED ALTRE PROCEDURE AD EVIDENZA PUBBLICA"
+
     def test_s2_codice_dal_testo_e_link_alla_gazzetta(self):
         acts = self._parse(PAGINA_S2, serie="S2")
         assert acts[0]["id"] == "26CE2527"
@@ -188,3 +223,34 @@ class TestAtti:
     def test_link_atto_non_canonico(self):
         """Il flag di navigazione lo toglie to_parquet, non il parser."""
         assert "codiceRedazionale=26G00215" in self._parse(PAGINA_SG)[0]["link"]
+
+PAGINA_S1 = """
+<html><body>
+<span class="rubrica">ATTI DI PROMOVIMENTO DEL GIUDIZIO DELLA CORTE</span>
+<span class="risultato">
+  <a href="/atto/corte_costituzionale/caricaDettaglioAtto/originario?atto.codiceRedazionale=26C00004">
+    <span class="data">n. 174 SENTENZA 6 luglio - 22 ottobre 2026</span>
+  </a>
+  <a href="/atto/corte_costituzionale/caricaDettaglioAtto/originario?atto.codiceRedazionale=26C00004">
+    Giudizio di legittimita' costituzionale in via incidentale.
+    <span class="pagina">Pag. 1</span>
+  </a>
+</span>
+</body></html>
+"""
+
+PAGINA_S5 = """
+<html><body>
+<span class="rubrica">CONTRATTI PUBBLICI</span>
+<span class="emettitore">ASTE IMMOBILIARI ED ALTRE PROCEDURE AD EVIDENZA PUBBLICA</span>
+<span class="risultato">
+  <a href="/atto/contratti/caricaDettaglioAtto/originario?atto.codiceRedazionale=26E00123">
+    <span class="data">AVVISO 12 ottobre 2026</span>
+  </a>
+  <a href="/atto/contratti/caricaDettaglioAtto/originario?atto.codiceRedazionale=26E00123">
+    Asta pubblica per l'alienazione di un immobile comunale.
+    <span class="pagina">Pag. 2</span>
+  </a>
+</span>
+</body></html>
+"""

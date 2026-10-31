@@ -20,7 +20,7 @@ RIGA = {
     "estremi": "DECRETO-LEGGE 23 luglio 2026, n. 127",
     "tipo_atto": "DECRETO-LEGGE",
     "ente": "PRESIDENZA DEL CONSIGLIO DEI MINISTRI",
-    "topic_str": "",
+    "sezione": "LEGGI ED ALTRI ATTI NORMATIVI",
     "link": "L1",
     "urn_normattiva": None,
     "link_normattiva": None,
@@ -112,7 +112,12 @@ class TestUrn:
             "('26A00001','SG','2026-07-24',NULL),"
             "('26G00153','S4','2026-07-24',NULL)"
         )
-        assert urn_pendenti(con, "merged") == [("26G00151", "2026-07-23")]
+        # Il predicato è il codice (come in verify_clean), non la serie:
+        # un 26G in S4 è comunque un atto normativo da risolvere.
+        assert urn_pendenti(con, "merged") == [
+            ("26G00151", "2026-07-23"),
+            ("26G00153", "2026-07-24"),
+        ]
         con.close()
 
     def test_applica_urn_scrive_link(self):

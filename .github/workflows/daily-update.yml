@@ -42,6 +42,9 @@ jobs:
       - name: Scarica l'event log
         run: make store-pull
 
+      - name: Backup dello store corrente
+        run: make store-backup
+
       # Un errore parziale non deve buttare via gli atti raccolti: il delta
       # viene scritto e applicato, il run diventa rosso alla fine.
       - name: Cattura incrementale

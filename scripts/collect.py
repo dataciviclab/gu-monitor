@@ -45,37 +45,6 @@ MAX_RICHIESTE_PER_ANNO = 1200
 NORMATTIVA_LINK = "https://www.normattiva.it/uri-res/N2Ls?"
 NORMATTIVA_API = "https://api.normattiva.it/t/normattiva.api/bff-opendata/v1/api/v1"
 
-TOPIC_KEYWORDS = {
-    "fisco": ["fiscale", "tributario", "tributi", "imposta", "irpef", "iva", "accisa",
-              "bilancio", "rendicont"],
-    "sanita": ["farmaco", "medicinale", "sanitario", "ospedaliero", "asl", "aifa",
-               "medicin", "comirnaty", "linagliptin"],
-    "lavoro": ["lavoro", "lavoratori", "impiego", "concors", "dipendente", "pubblico",
-               "borsa di ricerca", "assegno di ricerca"],
-    "ambiente": ["ambiente", "ecolog", "compost", "rifiuti", "inquinamento",
-                 "bonifica", "sostenibilit"],
-    "appalti": ["appalto", "contratto", "gara", "bandimento", "astante"],
-    "pnrr": ["pnrr", "ripresa", "resilienza", "next generation"],
-    "energia": ["energia", "elettric", "gas", "idrogeno", "carburante", "impianto fotovoltaico"],
-    "giustizia": ["giustizia", "penale", "civile", "tribunale", "corte",
-                  "notifica", "sentenza", "curatore", "falliment", "eredit"],
-    "europa": ["europeo", "europea", "ue ", "regolamento (ue)", "decisione (ue)",
-               "decisione pesc"],
-    "agricoltura": ["agricoltura", "agricolo", "zootecnico", "alimentare", "pesca",
-                    "viticolo", "denominazione di origine"],
-    "istruzione": ["universit", "ricercat", "docente", "studente", "laurea",
-                   "politecnico", "scuola"],
-    "trasporti": ["trasport", "autostrad", "ferroviario", "aeronautico", "portuale"],
-    "edilizia": ["edilizia", "casa", "immobiliare", "urbanistica", "catasto"],
-    "sicurezza": ["sicurezza", "polizia", "carabinieri", "vigili del fuoco"],
-    "business": ["societa'", "cooperativ", "assemblea", "s.p.a.", "s.r.l.", "s.a.s.",
-                 "conferimento"],
-    "governo_locale": ["regione", "regionale", "provincia", "comune di", "comunale",
-                       "concessione", "demaniale"],
-    "sanita_farmaci": ["autorizzazione all'immissione in commercio",
-                       "immissione in commercio"],
-}
-
 # Riclassifica degli ALTRO (il tipo non è negli estremi ma nel titolo).
 TIPO_TITLE_KEYWORDS = [
     "CONCORSO", "SENTENZA", "NOTIFICA", "CONFERIMENTO", "CONVOCAZIONE",
@@ -142,19 +111,13 @@ def link_canonico(url: str) -> str:
     return urlunsplit((parti.scheme, parti.netloc, parti.path, urlencode(params), parti.fragment))
 
 
-def extract_topics(titolo: str, content: str = "") -> list[str]:
-    text = f"{titolo} {content}".lower()
-    return sorted({t for t, kws in TOPIC_KEYWORDS.items() if any(kw in text for kw in kws)})
-
-
 def enrich(righe: list[dict]) -> list[dict]:
-    """Normalizza date e link, calcola topic e riclassifica gli ALTRO."""
+    """Normalizza date e link, riclassifica gli ALTRO."""
     for a in righe:
         d = a.get("data_pubblicazione", "")
         if re.match(r"\d{2}-\d{2}-\d{4}", d):
             a["data_pubblicazione"] = f"{d[6:]}-{d[3:5]}-{d[:2]}"
         a["link"] = link_canonico(a.get("link", ""))
-        a["topic_str"] = ",".join(extract_topics(a.get("titolo", "")))
         if a.get("tipo_atto") == "ALTRO":
             upper = a.get("titolo", "").upper()
             for keyword in TIPO_TITLE_KEYWORDS:
@@ -216,8 +179,11 @@ def normattiva_search(codice: str, data_gu: str) -> str | None:
 def urn_pendenti(con, table: str) -> list[tuple[str, str]]:
     """Atti normativi senza URN: (id, data di pubblicazione)."""
     return con.execute(
+        # Stesso predicato di verify_clean (codice_genere = 'G'): se un giorno
+        # un atto non-SG avesse codice G, la guardia e il crossref devono
+        # guardare lo stesso insieme.
         f"""SELECT id, CAST(data_pubblicazione AS VARCHAR) FROM {table}
-            WHERE serie = 'SG' AND regexp_matches(id, '^[0-9]{{2}}G')
+            WHERE regexp_matches(id, '^[0-9]{{2}}G')
               AND COALESCE(urn_normattiva, '') = ''
             ORDER BY data_pubblicazione"""
     ).fetchall()
@@ -265,7 +231,7 @@ COLONNE = {
     "estremi": "VARCHAR",
     "tipo_atto": "VARCHAR",
     "ente": "VARCHAR",
-    "topic_str": "VARCHAR",
+    "sezione": "VARCHAR",
     "link": "VARCHAR",
     "urn_normattiva": "VARCHAR",
     "link_normattiva": "VARCHAR",
