@@ -9,12 +9,10 @@ Non contiene orchestrazione: la cattura incrementale e il backfill stanno in
 collect.py.
 """
 
-import random
 import re
-import time
-from urllib.request import Request, urlopen
 
 from bs4 import BeautifulSoup
+from lab_connectors.http import download
 
 BASE = "https://www.gazzettaufficiale.it"
 
@@ -103,19 +101,14 @@ def _pulisci_testo(testo: str) -> str:
 
 
 def fetch(url: str, timeout: int = 20, retries: int = 3) -> str:
-    last_err = None
-    for attempt in range(1, retries + 1):
-        try:
-            req = Request(url, headers={"User-Agent": "GU-Monitor/0.1"})
-            with urlopen(req, timeout=timeout) as resp:
-                return resp.read().decode("utf-8", errors="replace")
-        except (OSError, TimeoutError) as e:
-            last_err = e
-            if attempt < retries:
-                wait = random.uniform(0, 2**attempt)
-                print(f"    Retry {attempt}/{retries} tra {wait:.1f}s ({e})", flush=True)
-                time.sleep(wait)
-    raise last_err
+    """Scarica una pagina con la catena HTTP condivisa (retry + SSL fallback)."""
+    data = download(
+        url,
+        timeout=timeout,
+        user_agent="GU-Monitor/0.1",
+        max_retries=retries,
+    )
+    return data.decode("utf-8", errors="replace")
 
 
 # ── Pagine di elenco ───────────────────────────────────────────────────

@@ -24,7 +24,6 @@ import time
 from datetime import date, timedelta
 from pathlib import Path
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
-from urllib.request import Request, urlopen
 
 import duckdb
 
@@ -146,15 +145,17 @@ def build_urn(tipo: str, anno: int, mese: int, giorno: int, numero: int) -> str:
 def normattiva_search(codice: str, data_gu: str) -> str | None:
     """URN dell'atto su Normattiva, o None se non c'è/ non è numerato."""
     payload = {"dataGU": data_gu, "codiceRedazionale": codice, "formatoRichiesta": "V"}
-    req = Request(
-        f"{NORMATTIVA_API}/atto/dettaglio-atto",
-        data=json.dumps(payload).encode(),
-        headers={"Content-Type": "application/json", "Accept": "application/json",
-                 "User-Agent": "GU-Monitor/0.1"},
-    )
     try:
-        with urlopen(req, timeout=30) as resp:
-            data = json.loads(resp.read())
+        from lab_connectors.http import HttpClient
+
+        result = HttpClient(timeout=30, user_agent="GU-Monitor/0.1").post(
+            f"{NORMATTIVA_API}/atto/dettaglio-atto",
+            data=json.dumps(payload).encode(),
+            headers={"Content-Type": "application/json", "Accept": "application/json"},
+        )
+        if not result.is_ok or result.response is None or result.response.status_code >= 400:
+            raise RuntimeError(f"HTTP {result.response.status_code if result.response else 'no response'}")
+        data = result.response.json()
     except Exception as e:  # noqa: BLE001
         print(f"  ERRORE Normattiva {codice}: {e}", file=sys.stderr)
         return None
