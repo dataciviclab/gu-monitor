@@ -2,7 +2,7 @@
   "schema_version": 1,
   "repo": "gu-monitor",
   "source_repo": "dataciviclab/gu-monitor",
-  "updated_at": "2026-11-16",
+  "updated_at": "2026-11-17",
   "datasets": [
     {
       "slug": "gu_atti",
@@ -157,7 +157,7 @@
       "detail": "anno 2026 — mart: si",
       "action": "",
       "run": {
-        "run_id": "20261116T143704Z_21233527",
+        "run_id": "20261117T152652Z_5c21b0e1",
         "year": 2026,
         "status": "SUCCESS",
         "quality_score": {
@@ -166,17 +166,17 @@
           "mart": 100
         },
         "output_rows": {
-          "clean": 27271,
-          "mart": 1054
+          "clean": 27325,
+          "mart": 1058
         },
         "output_bytes": {
-          "raw": 1079391,
-          "clean": 1070131,
-          "mart": 24110
+          "raw": 1083159,
+          "clean": 1073791,
+          "mart": 24191
         },
-        "started_at": "2026-11-16T14:37:04.176877+00:00",
-        "finished_at": "2026-11-16T14:37:04.543050+00:00",
-        "duration_seconds": 0.366
+        "started_at": "2026-11-17T15:26:52.488466+00:00",
+        "finished_at": "2026-11-17T15:26:52.839522+00:00",
+        "duration_seconds": 0.351
       }
     }
   ],
