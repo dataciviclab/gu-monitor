@@ -71,38 +71,73 @@ class TestPartizione:
 
 class TestMart:
     """I mart devono essere una derivazione esatta del clean, non un volume
-    minimo: un invariante che vale anche il 2 gennaio."""
+    minimo: volume, gruppi e grana valgono anche il 2 gennaio."""
 
     @pytest.fixture
-    def marts(self, tmp_path):
+    def scenario(self, tmp_path):
         con = duckdb.connect()
+        clean = tmp_path / "clean.parquet"
+        # 7 atti, un solo gruppo (serie, giorno), 2 tipi, 1 con URN.
+        con.execute(
+            f"""copy (select * from (values
+                ('SG', DATE '2026-01-02', 'LEGGE', 'urn:a'),
+                ('SG', DATE '2026-01-02', 'LEGGE', ''),
+                ('SG', DATE '2026-01-02', 'LEGGE', ''),
+                ('SG', DATE '2026-01-02', 'LEGGE', ''),
+                ('SG', DATE '2026-01-02', 'DECRETO', ''),
+                ('SG', DATE '2026-01-02', 'DECRETO', ''),
+                ('SG', DATE '2026-01-02', 'DECRETO', '')
+            ) t(serie, data_pubblicazione, tipo_atto, urn_normattiva))
+            to '{clean}' (format parquet)"""
+        )
+        con.execute(
+            f"""copy (select 'SG' as serie, DATE '2026-01-02' as data_pubblicazione,
+                      7 as atti, 1 as enti) to
+                '{tmp_path}/mart_atti_per_serie_giorno.parquet' (format parquet)"""
+        )
+        con.execute(
+            f"""copy (select * from (values ('LEGGE', 4, 1, 1), ('DECRETO', 3, 1, 1))
+                      t(tipo_atto, atti, serie, enti)) to
+                '{tmp_path}/mart_atti_per_tipo.parquet' (format parquet)"""
+        )
+        con.execute(
+            f"""copy (select 'urn:a' as urn_normattiva) to
+                '{tmp_path}/mart_normativi_urn.parquet' (format parquet)"""
+        )
+        return con, tmp_path, clean
 
-        def vol(atti: int) -> str:
-            return (
-                "select 'SG' as serie, DATE '2026-01-02' as data_pubblicazione, "
-                f"{atti} as atti, 1 as enti"
-            )
+    def test_derivazione_esatta(self, scenario):
+        con, d, clean = scenario
+        assert controlla_mart(con, clean, d, 2026, righe=7, righe_urn=1) == []
 
-        for nome in ("mart_atti_per_serie_giorno", "mart_atti_per_tipo"):
-            con.execute(
-                f"copy ({vol(3)} union all {vol(4)}) to "
-                f"'{tmp_path}/{nome}.parquet' (format parquet)"
-            )
-        con.execute(f"copy ({vol(3)}) to '{tmp_path}/mart_normativi_urn.parquet' (format parquet)")
-        return con, tmp_path
-
-    def test_volume_coerente(self, marts):
-        con, d = marts
-        assert controlla_mart(con, d, 2026, righe=7, righe_urn=1) == []
-
-    def test_volume_incoerente(self, marts):
-        con, d = marts
-        errori = controlla_mart(con, d, 2026, righe=5, righe_urn=9)
+    def test_volume_incoerente(self, scenario):
+        con, d, clean = scenario
+        errori = controlla_mart(con, clean, d, 2026, righe=5, righe_urn=9)
         assert any("somma atti 7, clean 5" in e for e in errori)
-        assert any("9 righe" in e or "atti con URN 9" in e for e in errori)
+        assert any("atti con URN 9" in e for e in errori)
 
-    def test_mart_assente(self, marts):
-        con, d = marts
+    def test_gruppi_collassati(self, scenario):
+        """Un GROUP BY che perde `data_pubblicazione` tiene la somma e dimezza
+        le righe: è il caso che i floor vecchi coprivano e la somma no."""
+        con, d, clean = scenario
+        con.execute(
+            f"""copy (select * from (values
+                ('SG', DATE '2026-01-02', 'LEGGE', 'urn:a'),
+                ('SG', DATE '2026-01-03', 'LEGGE', ''),
+                ('SG', DATE '2026-01-03', 'LEGGE', ''),
+                ('SG', DATE '2026-01-03', 'LEGGE', ''),
+                ('SG', DATE '2026-01-03', 'DECRETO', ''),
+                ('SG', DATE '2026-01-03', 'DECRETO', ''),
+                ('SG', DATE '2026-01-03', 'DECRETO', '')
+            ) t(serie, data_pubblicazione, tipo_atto, urn_normattiva))
+            to '{clean}' (format parquet)"""
+        )
+        errori = controlla_mart(con, clean, d, 2026, righe=7, righe_urn=1)
+        assert any("1 righe, 2 gruppi nel clean" in e for e in errori)
+        assert not any("somma atti" in e for e in errori)
+
+    def test_mart_assente(self, scenario):
+        con, d, clean = scenario
         (d / "mart_atti_per_tipo.parquet").unlink()
-        errori = controlla_mart(con, d, 2026, righe=7, righe_urn=1)
+        errori = controlla_mart(con, clean, d, 2026, righe=7, righe_urn=1)
         assert any("mart assente" in e for e in errori)

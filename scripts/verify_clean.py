@@ -78,15 +78,30 @@ def minimo_righe(anno: int, oggi: date) -> int:
 MART_VOLUMI = ("mart_atti_per_serie_giorno", "mart_atti_per_tipo")
 MART_URN = "mart_normativi_urn"
 
+# Colonne che definiscono il gruppo di ogni mart di volume: una riga per
+# combinazione distinta nel clean.
+GRUPPI = {
+    "mart_atti_per_serie_giorno": "serie, data_pubblicazione",
+    "mart_atti_per_tipo": "tipo_atto",
+}
 
-def controlla_mart(con, marts: Path, anno: int, righe: int, righe_urn: int) -> list[str]:
-    """I mart sono derivazioni del clean: il loro volume deve tornare esatto.
+
+def controlla_mart(
+    con, clean: Path, marts: Path, anno: int, righe: int, righe_urn: int
+) -> list[str]:
+    """I mart sono derivazioni del clean: il loro volume e i loro gruppi devono
+    tornare esatti.
 
     Sostituisce i floor di riga che stavano in `dataset.yml`, dove valevano per
     ogni partizione e avrebbero bocciato una partizione di gennaio (due giorni
     di Gazzetta non fanno 100 righe di serie×giorno, né 10 tipi). Un invariante
-    esatto vale per qualunque giorno: la somma degli atti dei mart è il numero
-    di atti del clean, e il mart URN ha una riga per ogni atto con URN.
+    esatto vale per qualunque giorno:
+
+    - la somma degli atti dei due mart di volume è il numero di atti del clean;
+    - il numero di righe è il numero di gruppi distinti nel clean — la somma
+      resta giusta anche se un `GROUP BY` perde una colonna e collassa i gruppi,
+      il conteggio no;
+    - il mart URN ha una riga per ogni atto con URN.
     """
     errori: list[str] = []
     for nome in MART_VOLUMI:
@@ -99,6 +114,19 @@ def controlla_mart(con, marts: Path, anno: int, righe: int, righe_urn: int) -> l
         ).fetchone()[0]
         if tot != righe:
             errori.append(f"{nome}: somma atti {tot}, clean {righe} (anno {anno})")
+
+    # Granularità: una riga per gruppo. Un GROUP BY che perde una colonna
+    # mantiene la somma e dimezza le righe — questo confronto lo vede.
+    for nome, chiavi in GRUPPI.items():
+        f = marts / f"{nome}.parquet"
+        if not f.exists():
+            continue  # già segnalato sopra
+        attese = con.execute(
+            f"select count(*) from (select distinct {chiavi} from read_parquet('{clean}'))"
+        ).fetchone()[0]
+        got = con.execute(f"select count(*) from read_parquet('{f}')").fetchone()[0]
+        if got != attese:
+            errori.append(f"{nome}: {got} righe, {attese} gruppi nel clean (anno {anno})")
 
     f = marts / f"{MART_URN}.parquet"
     if not f.exists():
@@ -182,7 +210,7 @@ def main() -> int:
             "select count(*) filter (where urn_normattiva <> '') from read_parquet('{f}')",
         )
         errori.extend(
-            controlla_mart(con, MART_DIR / str(anno), anno, righe, righe_urn)
+            controlla_mart(con, f, MART_DIR / str(anno), anno, righe, righe_urn)
         )
 
         # ── Ponte URN ───────────────────────────────────────────────────
