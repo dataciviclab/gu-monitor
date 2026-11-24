@@ -20,10 +20,15 @@ dataset:
     serie (Serie Generale, Corte Costituzionale, Unione Europea, Regioni,
     Concorsi, Contratti Pubblici, Parte II). Un record per atto, con estremi,
     oggetto, ente emittente e URN NIR quando l'atto è normativo.
+  # Un anno per partizione pubblicata. Il backfill di 2024-2025 è già nello
+  # store su GCS (rebuild.yml, 31/10 e 18/11): qui si dichiara solo cosa
+  # pubblicare.
   years:
+    - 2024
+    - 2025
     - 2026
   time_coverage:
-    start_year: 2026
+    start_year: 2024
     end_year: 2026
 
 # Il raw è l'event log catturato da capture.py e tenuto in data/gu_acts.parquet.
@@ -51,8 +56,13 @@ clean:
     - tipo_atto
   sql: sql/clean.sql
   validate:
+    # La chiave naturale è `(id, serie)`: il codice redazionale da solo non è
+    # unico. Misurato sullo store (98.764 atti, 2024-2026): 3 collisioni, tutte
+    # fra serie diverse — `24A00906` e `24E04094` (S4 vs SG), `25A00676` (SG vs
+    # S4). Sono atti distinti: deduplicare perderebbe un atto vero.
     primary_key:
       - id
+      - serie
     not_null:
       - id
       - serie
@@ -64,7 +74,12 @@ clean:
       anno:
         min: 1861
         max: 2100
-    min_rows: 1000
+    # Floor basso di proposito: qui basta impedire un clean vuoto. La soglia
+    # vera sta in `scripts/verify_clean.py`, che la applica per anno (1000 per
+    # un anno chiuso, non-vuoto per l'anno aperto) e gira prima del sync.
+    # Con 1000 qui, il 1° gennaio il build fallirebbe per ~10 giorni, e con
+    # lui la pubblicazione anche degli anni chiusi.
+    min_rows: 1
 
 mart:
   tables:
@@ -79,13 +94,15 @@ mart:
     - mart_atti_per_tipo
     - mart_normativi_urn
   validate:
+    # I floor di riga non possono stare qui: qui girano per **ogni** partizione,
+    # e una partizione di gennaio (due giorni, poche decine di atti) non
+    # raggiunge nessuna soglia annuale — nemmeno `mart_normativi_urn`, che nei
+    # primi giorni può essere legittimamente vuota. Le soglie per anno stanno
+    # in `scripts/verify_clean.py`, che le applica solo agli anni chiusi.
     table_rules:
       mart_atti_per_serie_giorno:
         required_columns: [serie, data_pubblicazione, atti]
-        min_rows: 100
       mart_atti_per_tipo:
         required_columns: [tipo_atto, atti]
-        min_rows: 10
       mart_normativi_urn:
         required_columns: [id, urn_normattiva]
-        min_rows: 1

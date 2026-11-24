@@ -1,6 +1,7 @@
 -- Clean: tipizza e valida l'event log della Gazzetta Ufficiale.
--- Un record per atto (PK = id, codice redazionale). Il filtro sull'anno
--- rende il dataset partizionabile lasciando il raw cumulativo.
+-- Un record per atto (PK = id + serie, non il solo id: tre codici redazionali
+-- 2024-2025 sono riusati in un'altra serie per un atto diverso). Il filtro
+-- sull'anno rende il dataset partizionabile lasciando il raw cumulativo.
 --
 -- codice_genere separa i due universi del dataset:
 --   G = codice AAGG######, l'unico che Normattiva indicizza (ha URN)
