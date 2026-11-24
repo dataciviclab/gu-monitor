@@ -74,7 +74,12 @@ clean:
       anno:
         min: 1861
         max: 2100
-    min_rows: 1000
+    # Floor basso di proposito: qui basta impedire un clean vuoto. La soglia
+    # vera sta in `scripts/verify_clean.py`, che la applica per anno (1000 per
+    # un anno chiuso, non-vuoto per l'anno aperto) e gira prima del sync.
+    # Con 1000 qui, il 1° gennaio il build fallirebbe per ~10 giorni, e con
+    # lui la pubblicazione anche degli anni chiusi.
+    min_rows: 1
 
 mart:
   tables:
