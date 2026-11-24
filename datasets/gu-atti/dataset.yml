@@ -20,10 +20,15 @@ dataset:
     serie (Serie Generale, Corte Costituzionale, Unione Europea, Regioni,
     Concorsi, Contratti Pubblici, Parte II). Un record per atto, con estremi,
     oggetto, ente emittente e URN NIR quando l'atto è normativo.
+  # Un anno per partizione pubblicata. Il backfill di 2024-2025 è già nello
+  # store su GCS (rebuild.yml, 31/10 e 18/11): qui si dichiara solo cosa
+  # pubblicare.
   years:
+    - 2024
+    - 2025
     - 2026
   time_coverage:
-    start_year: 2026
+    start_year: 2024
     end_year: 2026
 
 # Il raw è l'event log catturato da capture.py e tenuto in data/gu_acts.parquet.
@@ -51,8 +56,13 @@ clean:
     - tipo_atto
   sql: sql/clean.sql
   validate:
+    # La chiave naturale è `(id, serie)`: il codice redazionale da solo non è
+    # unico. Misurato sullo store (98.764 atti, 2024-2026): 3 collisioni, tutte
+    # fra serie diverse — `24A00906` e `24E04094` (S4 vs SG), `25A00676` (SG vs
+    # S4). Sono atti distinti: deduplicare perderebbe un atto vero.
     primary_key:
       - id
+      - serie
     not_null:
       - id
       - serie

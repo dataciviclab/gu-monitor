@@ -39,8 +39,27 @@ def main() -> int:
     con = duckdb.connect()
     errori: list[str] = []
     soglia = date.today() - timedelta(days=ETA_URN_GIORNI)
+    anno_corrente = date.today().year
+
+    # La partizione dell'anno corrente deve esserci: senza, il dataset
+    # pubblicato smette di aggiornarsi in silenzio.
+    partizioni: list[int] = []
+    for f in files:
+        try:
+            partizioni.append(int(f.parent.name))
+        except ValueError:
+            errori.append(f"{f.parent.name}: partizione non-anno ({f})")
+    if anno_corrente not in partizioni:
+        errori.append(
+            f"partizione {anno_corrente} assente (trovate: {sorted(partizioni)})"
+        )
 
     for f in files:
+        try:
+            anno = int(f.parent.name)
+        except ValueError:
+            anno = anno_corrente
+
         righe = _conta(con, f, "select count(*) from read_parquet('{f}')")
         if righe < MIN_RIGHE:
             errori.append(f"{f.name}: {righe} righe (minimo {MIN_RIGHE})")
@@ -50,10 +69,17 @@ def main() -> int:
         ).fetchone()[0]
         if ultima is None:
             errori.append(f"{f.name}: nessuna data di pubblicazione")
-        else:
+        elif anno == anno_corrente:
+            # Solo l'anno aperto può essere "stantio": un anno chiuso finisce
+            # per definizione al 31/12, e pretenderlo fresco vorrebbe dire non
+            # poter pubblicare la storia.
             giorni = (date.today() - ultima).days
             if giorni > MAX_GIORNI_STANTII:
                 errori.append(f"{f.name}: ultima pubblicazione {ultima} ({giorni} giorni fa)")
+        elif ultima.year != anno:
+            errori.append(
+                f"{f.name}: anno chiuso ma ultima pubblicazione {ultima} fuori dal {anno}"
+            )
 
         # ── Ponte URN ───────────────────────────────────────────────────
         # È ciò che rende la serie G uno stream verso legal-graph. La

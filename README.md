@@ -4,7 +4,7 @@
 
 La Gazzetta Ufficiale è il diario ufficiale dello Stato italiano. Ogni legge, ogni decreto, ogni bando di concorso passa da qui. Ma nessuno la monitora sistematicamente.
 
-Questo progetto lo fa: le **7 serie** della Gazzetta, un record per atto. La colonna `codice_genere` separa i **218 atti normativi** (codici `AAGG######`, gli unici che Normattiva indicizza) dal resto — avvisi, concorsi, sentenze, notifiche.
+Questo progetto lo fa: le **7 serie** della Gazzetta, un record per atto. La colonna `codice_genere` separa i **~220 atti normativi l'anno** (codici `AAGG######`, gli unici che Normattiva indicizza; 226 nel 2024, 219 nel 2025, 230 nel 2026 al 21/11) dal resto — avvisi, concorsi, sentenze, notifiche.
 
 [![CI](https://github.com/dataciviclab/gu-monitor/actions/workflows/ci.yml/badge.svg)](https://github.com/dataciviclab/gu-monitor/actions/workflows/ci.yml)
 [![Daily Update](https://github.com/dataciviclab/gu-monitor/actions/workflows/daily-update.yml/badge.svg)](https://github.com/dataciviclab/gu-monitor/actions/workflows/daily-update.yml)
@@ -33,7 +33,7 @@ Streamlit, deployata su Streamlit Cloud. La dashboard vive in `dashboard/`; l'`a
 | Pagina | Cosa mostra |
 |---|---|
 | Panoramica | atti per serie, normativi vs resto, enti che pubblicano di più |
-| Atti normativi | i 218 atti/anno con estremi, ente e link Normattiva |
+| Atti normativi | i ~220 atti/anno con estremi, ente e link Normattiva |
 | Sezioni | le rubriche della Gazzetta |
 | Query SQL | SQL libero sul clean |
 
@@ -52,8 +52,10 @@ streamlit run app.py
 
 Il cuore è l'**event log**: un singolo Parquet con tutti gli atti unici, tenuto su
 `gs://dataciviclab-clean/gu-monitor/_event_log/` (non in git). In locale lo scarichi
-con `make store-pull`. Chiave: `id` (codice redazionale). Il dataset pubblicato è
-invece `gs://dataciviclab-clean/gu-monitor/gu_atti/<anno>/`.
+con `make store-pull`. Chiave: **`(id, serie)`** — il codice redazionale da solo
+non basta: 3 atti su 98.764 riusano un codice in un'altra serie (2024: `24A00906`
+in S4 e SG, `24E04094` in S4 e SG; 2025: `25A00676` in SG e S4). Il dataset
+pubblicato è invece `gs://dataciviclab-clean/gu-monitor/gu_atti/<anno>/`.
 
 Lo store tiene anche due campi grezzi della pagina (`rubrica_raw`, `emittitore_raw`)
 che **non** entrano nel clean: servono a correggere `sezione`/`ente` con un `UPDATE`
