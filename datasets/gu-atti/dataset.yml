@@ -94,13 +94,15 @@ mart:
     - mart_atti_per_tipo
     - mart_normativi_urn
   validate:
+    # I floor di riga non possono stare qui: qui girano per **ogni** partizione,
+    # e una partizione di gennaio (due giorni, poche decine di atti) non
+    # raggiunge nessuna soglia annuale — nemmeno `mart_normativi_urn`, che nei
+    # primi giorni può essere legittimamente vuota. Le soglie per anno stanno
+    # in `scripts/verify_clean.py`, che le applica solo agli anni chiusi.
     table_rules:
       mart_atti_per_serie_giorno:
         required_columns: [serie, data_pubblicazione, atti]
-        min_rows: 100
       mart_atti_per_tipo:
         required_columns: [tipo_atto, atti]
-        min_rows: 10
       mart_normativi_urn:
         required_columns: [id, urn_normattiva]
-        min_rows: 1

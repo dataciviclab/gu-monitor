@@ -17,6 +17,7 @@ import duckdb
 ROOT = Path(__file__).parent.parent
 CLEAN_GLOB = "out/data/clean/gu_atti/*/gu_atti_*_clean.parquet"
 STORE = ROOT / "data/gu_acts.parquet"
+MART_DIR = ROOT / "out/data/mart/gu_atti"
 
 MIN_RIGHE = 1_000
 MAX_GIORNI_STANTII = 14
@@ -72,6 +73,41 @@ def minimo_righe(anno: int, oggi: date) -> int:
     e con lui la pubblicazione degli anni chiusi.
     """
     return MIN_RIGHE if anno < oggi.year else 1
+
+
+MART_VOLUMI = ("mart_atti_per_serie_giorno", "mart_atti_per_tipo")
+MART_URN = "mart_normativi_urn"
+
+
+def controlla_mart(con, marts: Path, anno: int, righe: int, righe_urn: int) -> list[str]:
+    """I mart sono derivazioni del clean: il loro volume deve tornare esatto.
+
+    Sostituisce i floor di riga che stavano in `dataset.yml`, dove valevano per
+    ogni partizione e avrebbero bocciato una partizione di gennaio (due giorni
+    di Gazzetta non fanno 100 righe di serie×giorno, né 10 tipi). Un invariante
+    esatto vale per qualunque giorno: la somma degli atti dei mart è il numero
+    di atti del clean, e il mart URN ha una riga per ogni atto con URN.
+    """
+    errori: list[str] = []
+    for nome in MART_VOLUMI:
+        f = marts / f"{nome}.parquet"
+        if not f.exists():
+            errori.append(f"{nome}: mart assente per il {anno}")
+            continue
+        tot = con.execute(
+            f"select coalesce(sum(atti), 0) from read_parquet('{f}')"
+        ).fetchone()[0]
+        if tot != righe:
+            errori.append(f"{nome}: somma atti {tot}, clean {righe} (anno {anno})")
+
+    f = marts / f"{MART_URN}.parquet"
+    if not f.exists():
+        errori.append(f"{MART_URN}: mart assente per il {anno}")
+    else:
+        tot = con.execute(f"select count(*) from read_parquet('{f}')").fetchone()[0]
+        if tot != righe_urn:
+            errori.append(f"{MART_URN}: {tot} righe, atti con URN {righe_urn} (anno {anno})")
+    return errori
 
 
 def _ultima_nello_store(con) -> date | None:
@@ -139,6 +175,16 @@ def main() -> int:
                 f"{f.name}: anno chiuso ma ultima pubblicazione {ultima} fuori dal {anno}"
             )
 
+        # ── Mart: derivazione esatta del clean ───────────────────────────
+        righe_urn = _conta(
+            con,
+            f,
+            "select count(*) filter (where urn_normattiva <> '') from read_parquet('{f}')",
+        )
+        errori.extend(
+            controlla_mart(con, MART_DIR / str(anno), anno, righe, righe_urn)
+        )
+
         # ── Ponte URN ───────────────────────────────────────────────────
         # È ciò che rende la serie G uno stream verso legal-graph. La
         # copertura è per età: i nuovi possono essere in ritardo su
@@ -148,7 +194,10 @@ def main() -> int:
                 from read_parquet('{f}') where codice_genere = 'G'"""
         ).fetchone()
         if not tot:
-            errori.append(f"{f.name}: nessun atto normativo (codice_genere = 'G')")
+            # In un anno chiuso zero normativi è implausibile (226 · 219 · 230):
+            # è un buco. Nell'anno aperto i primi giorni possono non averne.
+            if anno < oggi.year:
+                errori.append(f"{f.name}: nessun atto normativo (codice_genere = 'G')")
         else:
             pct = 100.0 * con_urn / tot
             if pct < MIN_URN_PCT_TOTALE:
