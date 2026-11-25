@@ -1,19 +1,18 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "repo": "gu-monitor",
   "source_repo": "dataciviclab/gu-monitor",
-  "updated_at": "2026-11-24",
+  "updated_at": "2026-11-25",
+  "gcs": {
+    "clean": "year",
+    "prefix": "gu-monitor/"
+  },
   "datasets": [
     {
       "slug": "gu_atti",
       "name": "Gu Atti",
       "description": "Atti pubblicati sulla Gazzetta Ufficiale della Repubblica Italiana, nelle 7 serie (Serie Generale, Corte Costituzionale, Unione Europea, Regioni, Concorsi, Contratti Pubblici, Parte II). Un record per atto, con estremi, oggetto, ente emittente e URN NIR quando l'atto è normativo.\n",
-      "source": "",
       "source_id": "gazzetta_ufficiale",
-      "period": {
-        "start": 2024,
-        "end": 2026
-      },
       "tags": [
         "diritto",
         "normativa",
@@ -22,98 +21,93 @@
         "monitoraggio"
       ],
       "category": "normativa",
+      "period": {
+        "start": 2024,
+        "end": 2026
+      },
+      "partitions": {
+        "2024": 38166,
+        "2025": 32687,
+        "2026": 28140
+      },
       "columns": [
         {
           "name": "id",
           "type": "VARCHAR",
-          "role": "dimension",
-          "description": ""
+          "role": "dimension"
         },
         {
           "name": "codice_genere",
           "type": "VARCHAR",
-          "role": "dimension",
-          "description": ""
+          "role": "dimension"
         },
         {
           "name": "serie",
           "type": "VARCHAR",
-          "role": "dimension",
-          "description": ""
+          "role": "dimension"
         },
         {
           "name": "gazzetta_numero",
           "type": "VARCHAR",
-          "role": "dimension",
-          "description": ""
+          "role": "dimension"
         },
         {
           "name": "data_pubblicazione",
           "type": "DATE",
-          "role": "dimension",
-          "description": ""
+          "role": "dimension"
         },
         {
           "name": "anno",
           "type": "INTEGER",
           "role": "dimension",
-          "description": "",
           "semantic_type": "year"
         },
         {
           "name": "titolo",
           "type": "VARCHAR",
-          "role": "dimension",
-          "description": ""
+          "role": "dimension"
         },
         {
           "name": "estremi",
           "type": "VARCHAR",
-          "role": "dimension",
-          "description": ""
+          "role": "dimension"
         },
         {
           "name": "tipo_atto",
           "type": "VARCHAR",
-          "role": "dimension",
-          "description": ""
+          "role": "dimension"
         },
         {
           "name": "ente",
           "type": "VARCHAR",
-          "role": "dimension",
-          "description": ""
+          "role": "dimension"
         },
         {
           "name": "sezione",
           "type": "VARCHAR",
-          "role": "dimension",
-          "description": ""
+          "role": "dimension"
         },
         {
           "name": "urn_normattiva",
           "type": "VARCHAR",
-          "role": "dimension",
-          "description": ""
+          "role": "dimension"
         },
         {
           "name": "link",
           "type": "VARCHAR",
-          "role": "dimension",
-          "description": ""
+          "role": "dimension"
         }
       ],
-      "location": {
-        "type": "gcs",
-        "path": "gs://dataciviclab-clean/gu-monitor/gu_atti/*/gu_atti_*_clean.parquet",
-        "multi_file": true
-      },
-      "stage": "incubating",
       "mart_refs": [
         "gu_atti__mart_atti_per_serie_giorno",
         "gu_atti__mart_atti_per_tipo",
         "gu_atti__mart_normativi_urn"
-      ]
+      ],
+      "last_run": {
+        "at": "2026-11-25T16:44:07.413170+00:00",
+        "year": 2026,
+        "status": "SUCCESS"
+      }
     }
   ],
   "marts": [
@@ -121,84 +115,21 @@
       "slug": "gu_atti__mart_atti_per_serie_giorno",
       "dataset": "gu_atti",
       "table": "mart_atti_per_serie_giorno",
-      "location": {
-        "type": "gcs",
-        "path": "gs://dataciviclab-mart/gu-monitor/gu_atti/*/mart_atti_per_serie_giorno.parquet",
-        "multi_file": true
-      }
+      "layout": "glob"
     },
     {
       "slug": "gu_atti__mart_atti_per_tipo",
       "dataset": "gu_atti",
       "table": "mart_atti_per_tipo",
-      "location": {
-        "type": "gcs",
-        "path": "gs://dataciviclab-mart/gu-monitor/gu_atti/*/mart_atti_per_tipo.parquet",
-        "multi_file": true
-      }
+      "layout": "glob"
     },
     {
       "slug": "gu_atti__mart_normativi_urn",
       "dataset": "gu_atti",
       "table": "mart_normativi_urn",
-      "location": {
-        "type": "gcs",
-        "path": "gs://dataciviclab-mart/gu-monitor/gu_atti/*/mart_normativi_urn.parquet",
-        "multi_file": true
-      }
+      "layout": "glob"
     }
   ],
-  "signals": [
-    {
-      "id": "gu_atti",
-      "source_id": "gazzetta_ufficiale",
-      "status": "ok",
-      "label": "gu_atti",
-      "detail": "anni 2024-2026 — mart: si",
-      "action": "",
-      "run": {
-        "run_id": "20261124T134942Z_65b04734",
-        "year": 2026,
-        "status": "SUCCESS",
-        "quality_score": {
-          "raw": 100,
-          "clean": 95,
-          "mart": 100
-        },
-        "output_rows": {
-          "clean": 27911,
-          "mart": 1075
-        },
-        "output_bytes": {
-          "raw": 3764965,
-          "clean": 1097977,
-          "mart": 24285
-        },
-        "started_at": "2026-11-24T13:49:42.758058+00:00",
-        "finished_at": "2026-11-24T13:49:43.169360+00:00",
-        "duration_seconds": 0.411
-      }
-    }
-  ],
-  "codelists": [],
-  "entities": {
-    "entities": {
-      "Tempo": {
-        "entity": "Tempo",
-        "label": "Tempo / data",
-        "datasets": [
-          {
-            "slug": "gu_atti",
-            "name": "Gu Atti",
-            "column": "anno",
-            "semantic_type": "year"
-          }
-        ],
-        "types": {
-          "year": 1
-        }
-      }
-    },
-    "bridges": []
-  }
+  "checks": [],
+  "codelists": []
 }
