@@ -2,7 +2,7 @@
   "schema_version": 2,
   "repo": "gu-monitor",
   "source_repo": "dataciviclab/gu-monitor",
-  "updated_at": "2026-11-25",
+  "updated_at": "2026-11-26",
   "gcs": {
     "clean": "year",
     "prefix": "gu-monitor/"
@@ -28,7 +28,7 @@
       "partitions": {
         "2024": 38166,
         "2025": 32687,
-        "2026": 28140
+        "2026": 28169
       },
       "columns": [
         {
@@ -104,7 +104,7 @@
         "gu_atti__mart_normativi_urn"
       ],
       "last_run": {
-        "at": "2026-11-25T16:44:07.413170+00:00",
+        "at": "2026-11-26T16:17:24.169761+00:00",
         "year": 2026,
         "status": "SUCCESS"
       }
